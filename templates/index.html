@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤖 自動化案件ファインダー</title>
+  <style>
+    :root {
+      --orange: #FF6B35;
+      --orange2: #FF8C42;
+      --orange3: #FFA552;
+      --pale: #FFF3ED;
+      --bg: #FFF8F4;
+      --dark: #1E1E1E;
+      --gray: #6B7280;
+      --lgray: #F3F4F6;
+      --white: #FFFFFF;
+      --shadow: 0 4px 20px rgba(255,107,53,0.12);
+      --r: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: var(--bg); color: var(--dark); }
+
+    /* ヘッダー */
+    header {
+      background: linear-gradient(135deg, #FF5A1F 0%, var(--orange2) 60%, var(--orange3) 100%);
+      padding: 28px 20px 36px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: -20px; left: 50%;
+      transform: translateX(-50%);
+      width: 120%; height: 40px;
+      background: var(--bg);
+      border-radius: 50% 50% 0 0;
+    }
+    header h1 { font-size: 21px; font-weight: 800; color: #fff; }
+    header p { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 6px; }
+    .header-badges { display: flex; justify-content: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .hbadge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.35);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .hbadge:hover { background: rgba(255,255,255,0.35); }
+
+    /* タブ */
+    .tabs {
+      display: flex; gap: 8px; padding: 20px 16px 0;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; max-width: 840px; margin: 0 auto;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      flex-shrink: 0; padding: 10px 18px;
+      border-radius: 30px; border: 2px solid #E5E7EB;
+      background: var(--white); color: var(--gray);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .tab-btn.active { background: var(--orange); color: #fff; border-color: var(--orange); box-shadow: 0 4px 14px rgba(255,107,53,0.35); }
+    .tab-btn:not(.active):hover { border-color: var(--orange3); color: var(--orange); }
+
+    /* カテゴリ説明 */
+    .cat-header { padding: 14px 16px 6px; max-width: 840px; margin: 0 auto; }
+    .cat-desc {
+      background: var(--white); border-radius: var(--r);
+      padding: 14px 16px; border-left: 4px solid var(--orange);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .cat-desc-icon { font-size: 26px; }
+    .cat-desc-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .cat-desc-text { font-size: 12px; color: var(--gray); }
+
+    /* ローディング */
+    .loading { text-align: center; padding: 60px 20px; color: var(--gray); }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 4px solid var(--pale); border-top-color: var(--orange);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { font-size: 14px; line-height: 1.8; }
+
+    /* コンテナ */
+    .container { max-width: 840px; margin: 0 auto; padding: 0 16px 40px; }
+
+    .count-bar { font-size: 12px; color: var(--gray); text-align: right; padding: 12px 0 4px; }
+
+    /* サブカテゴリ見出し */
+    .sub-heading {
+      display: flex; align-items: center; gap: 8px;
+      margin: 18px 0 10px; padding-left: 2px;
+    }
+    .sub-heading-label {
+      font-size: 12px; font-weight: 700; color: var(--gray);
+      text-transform: uppercase; letter-spacing: 0.7px;
+    }
+    .sub-heading-stars { color: var(--orange); font-size: 13px; }
+    .sub-heading-tip {
+      font-size: 11px; color: var(--orange2);
+      background: var(--pale); padding: 2px 8px; border-radius: 10px;
+    }
+
+    /* カード */
+    .job-card {
+      background: var(--white); border-radius: var(--r);
+      padding: 16px; margin-bottom: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      border: 1.5px solid transparent;
+      transition: all 0.2s; display: block;
+      text-decoration: none; color: inherit;
+    }
+    .job-card:hover { border-color: var(--orange3); transform: translateY(-2px); box-shadow: var(--shadow); }
+
+    .card-row1 { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .job-title { font-size: 14px; font-weight: 700; line-height: 1.5; flex: 1; }
+    .stars-wrap { flex-shrink: 0; display: flex; gap: 1px; }
+    .st { font-size: 14px; }
+    .st.on { color: var(--orange); }
+    .st.off { color: #E5E7EB; }
+
+    .sub-tag {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      color: var(--orange); background: var(--pale);
+      padding: 2px 10px; border-radius: 20px; margin-bottom: 8px;
+    }
+    .interview-tag {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA;
+      padding: 2px 10px; border-radius: 20px; margin-bottom: 8px; margin-left: 6px;
+    }
+
+    .job-desc { font-size: 12px; color: var(--gray); line-height: 1.6; margin-bottom: 8px; }
+
+    .tip-row {
+      background: var(--pale); border-radius: 8px;
+      padding: 7px 12px; font-size: 12px; color: var(--orange);
+      display: flex; gap: 6px; margin-bottom: 8px;
+    }
+
+    .card-bottom { display: flex; justify-content: space-between; align-items: center; }
+    .price { font-size: 15px; font-weight: 800; color: var(--orange); }
+    .open-btn {
+      font-size: 12px; color: var(--orange2); font-weight: 600;
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    /* 空・エラー */
+    .empty { text-align: center; padding: 48px 20px; color: var(--gray); }
+    .empty .emoji { font-size: 48px; margin-bottom: 12px; }
+    .empty p { font-size: 13px; line-height: 1.8; }
+    .error-box { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; padding: 16px; font-size: 13px; color: #DC2626; margin: 16px 0; }
+
+    /* ━━━ 星条件モーダル ━━━ */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 100;
+      padding: 20px; overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .modal {
+      background: var(--white); border-radius: 20px;
+      padding: 24px 20px; width: 100%; max-width: 520px;
+      margin-top: 20px; position: relative;
+    }
+    .modal h2 { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+    .modal-sub { font-size: 12px; color: var(--gray); margin-bottom: 20px; }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--lgray); border: none;
+      font-size: 16px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .criteria-cat { margin-bottom: 20px; }
+    .criteria-cat-title {
+      font-size: 14px; font-weight: 700;
+      color: var(--orange); margin-bottom: 10px;
+      padding-bottom: 6px; border-bottom: 2px solid var(--pale);
+    }
+    .criteria-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border-radius: 10px;
+      background: var(--pale); margin-bottom: 6px;
+    }
+    .criteria-stars { font-size: 13px; color: var(--orange); white-space: nowrap; flex-shrink: 0; }
+    .criteria-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .criteria-reason { font-size: 11px; color: var(--gray); line-height: 1.5; }
+
+    /* 応募文ボタン */
+    .msg-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-top: 10px; padding: 8px 14px;
+      background: var(--orange); color: #fff;
+      border: none; border-radius: 20px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .msg-btn:hover { background: var(--orange2); }
+    .msg-btn:disabled { background: #ccc; cursor: default; }
+
+    /* 応募文モーダル */
+    .msg-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 200;
+      padding: 20px; overflow-y: auto;
+    }
+    .msg-modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .msg-modal {
+      background: var(--white); border-radius: 20px;
+      padding: 24px 20px; width: 100%; max-width: 540px;
+      margin-top: 40px; position: relative;
+    }
+    .msg-modal h2 { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+    .msg-modal-sub { font-size: 12px; color: var(--gray); margin-bottom: 16px; }
+    .msg-modal-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--lgray); border: none;
+      font-size: 16px; cursor: pointer;
+    }
+    .msg-body {
+      background: var(--pale); border-radius: 10px;
+      padding: 14px; font-size: 13px; line-height: 1.8;
+      color: var(--dark); white-space: pre-wrap;
+      min-height: 80px; margin-bottom: 14px;
+    }
+    .msg-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--pale); border-top-color: var(--orange);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 20px auto;
+    }
+    .copy-btn {
+      width: 100%; padding: 12px;
+      background: var(--orange); color: #fff;
+      border: none; border-radius: 12px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover { background: var(--orange2); }
+    .copy-btn.copied { background: #22c55e; }
+
+    /* フッター */
+    footer { text-align: center; padding: 20px; font-size: 11px; color: var(--gray); border-top: 1px solid rgba(0,0,0,0.06); }
+
+    @media (max-width: 480px) {
+      header h1 { font-size: 18px; }
+      .job-title { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 自動化案件ファインダー</h1>
+  <p>CrowdWorksから自動化しやすい案件だけを厳選表示</p>
+  <div class="header-badges">
+    <span class="hbadge" onclick="openModal()">⭐ 星の付け方を見る</span>
+    <span class="hbadge" style="cursor:default;">⭐3以上 = 自動化向き案件</span>
+  </div>
+</header>
+
+<!-- タブ -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('data_entry')" id="tab-data_entry">🗂️ データ入力</button>
+  <button class="tab-btn" onclick="switchTab('writing')" id="tab-writing">✍️ ライティング</button>
+  <button class="tab-btn" onclick="switchTab('sns')" id="tab-sns">📱 SNS運用</button>
+  <button class="tab-btn" onclick="switchTab('research')" id="tab-research">🔍 リサーチ</button>
+</div>
+
+<!-- カテゴリ説明 -->
+<div class="cat-header" id="cat-header"></div>
+
+<!-- 案件リスト -->
+<div class="container">
+  <div id="jobs-area">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>CrowdWorksから案件を取得中…<br>
+      <small style="color:#ccc">初回は1〜2分かかります。しばらくお待ちください。</small></p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  ⭐5=完全自動化可 / ⭐4=ほぼ自動化可 / ⭐3=部分的に自動化可 ｜ データは30分キャッシュ
+</footer>
+
+<!-- ━━━ 応募文モーダル ━━━ -->
+<div class="msg-modal-overlay" id="msg-modal-overlay" onclick="closeMsgModalOutside(event)">
+  <div class="msg-modal">
+    <button class="msg-modal-close" onclick="closeMsgModal()">✕</button>
+    <h2>✉️ 応募メッセージ</h2>
+    <p class="msg-modal-sub">案件の内容に合わせてAIが生成しました</p>
+    <div id="msg-body" class="msg-body"><div class="msg-spinner"></div></div>
+    <button class="copy-btn" id="copy-btn" onclick="copyMessage()">📋 コピーする</button>
+  </div>
+</div>
+
+<!-- ━━━ 星条件モーダル ━━━ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2>⭐ 星の付け方</h2>
+    <p class="modal-sub">各カテゴリ・サブカテゴリごとの自動化難易度の基準です</p>
+    <div id="criteria-content">読み込み中…</div>
+  </div>
+</div>
+
+<script>
+  const CAT_META = {
+    data_entry: { icon: '🗂️', name: 'データ入力', desc: 'テキスト・Excelへの転記など繰り返し作業。Pythonで完全自動化できるものが多い。' },
+    writing:    { icon: '✍️', name: '記事・ライティング', desc: 'AIで生成・量産できる文章系タスク。フォーマット固定だと特に自動化しやすい。' },
+    sns:        { icon: '📱', name: 'SNS運用', desc: 'コメント・投稿など反復的なSNS作業。Selenium+AIで効率化しやすい。' },
+    research:   { icon: '🔍', name: 'リサーチ・収集', desc: 'スクレイピングで自動化できる情報収集系。URL・リスト収集が最も向いている。' },
+  };
+
+  let allJobs = null;
+  let currentTab = 'data_entry';
+  let criteriaData = null;
+
+  function stars(n, total=5) {
+    return Array.from({length: total}, (_,i) =>
+      `<span class="st ${i < n ? 'on' : 'off'}">★</span>`
+    ).join('');
+  }
+
+  function renderCatHeader(tab) {
+    const c = CAT_META[tab];
+    document.getElementById('cat-header').innerHTML = `
+      <div class="cat-desc">
+        <div class="cat-desc-icon">${c.icon}</div>
+        <div>
+          <div class="cat-desc-name">${c.name}</div>
+          <div class="cat-desc-text">${c.desc}</div>
+        </div>
+      </div>`;
+  }
+
+  function groupBy(jobs, key) {
+    return jobs.reduce((acc, j) => {
+      (acc[j[key]] = acc[j[key]] || []).push(j);
+      return acc;
+    }, {});
+  }
+
+  function esc(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderJobs(tab) {
+    const area = document.getElementById('jobs-area');
+    if (!allJobs) return;
+    const jobs = allJobs[tab] || [];
+
+    if (jobs.length === 0) {
+      area.innerHTML = `<div class="empty"><div class="emoji">😅</div><p>このカテゴリの案件が見つかりませんでした。<br>しばらくしてから再試行してください。</p></div>`;
+      return;
+    }
+
+    const groups = groupBy(jobs, 'subcategory');
+    // スコア降順でソート
+    const sortedGroups = Object.entries(groups).sort((a,b) => b[1][0].score - a[1][0].score);
+
+    let html = `<div class="count-bar">${jobs.length}件の自動化向き案件が見つかりました</div>`;
+
+    sortedGroups.forEach(([subName, subJobs]) => {
+      const score = subJobs[0].score;
+      html += `
+        <div class="sub-heading">
+          <div class="stars-wrap">${stars(score)}</div>
+          <div class="sub-heading-label">${esc(subName)}</div>
+          <div class="sub-heading-tip">${esc(subJobs[0].tip || '')}</div>
+        </div>`;
+      subJobs.forEach(job => {
+        html += `
+          <div class="job-card" style="cursor:default;">
+            <a href="${esc(job.link)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
+              <div class="card-row1">
+                <div class="job-title">${esc(job.title)}</div>
+                <div class="stars-wrap">${stars(job.score)}</div>
+              </div>
+              <div>
+                <span class="sub-tag">🏷️ ${esc(job.subcategory)}</span>
+                ${job.needs_interview ? '<span class="interview-tag">📋 面接・Zoom必要</span>' : ''}
+              </div>
+              ${job.description ? `<div class="job-desc">${esc(job.description)}</div>` : ''}
+              ${job.tip ? `<div class="tip-row"><span>💡</span><span>${esc(job.tip)}</span></div>` : ''}
+              <div class="card-bottom">
+                <div class="price">${esc(job.price)}</div>
+                <div class="open-btn">CrowdWorksで見る →</div>
+              </div>
+            </a>
+            <button class="msg-btn" onclick="openMsgModal('${esc(job.link)}', this)">✉️ 応募文を生成</button>
+          </div>`;
+      });
+    });
+
+    area.innerHTML = html;
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    renderCatHeader(tab);
+    if (allJobs) renderJobs(tab);
+  }
+
+  async function loadJobs() {
+    try {
+      const res = await fetch('/api/jobs');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data.loading) {
+        // まだ取得中 → 10秒後に再ポーリング
+        document.getElementById('jobs-area').innerHTML = `
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>CrowdWorksから案件を取得中…<br>
+            <small style="color:#ccc">完了まで1〜2分かかります</small></p>
+          </div>`;
+        setTimeout(loadJobs, 10000);
+        return;
+      }
+      allJobs = data.jobs;
+      renderJobs(currentTab);
+    } catch(e) {
+      document.getElementById('jobs-area').innerHTML =
+        `<div class="error-box">⚠️ 案件の取得に失敗しました。ページを再読み込みしてください。<br><small>${e.message}</small></div>`;
+    }
+  }
+
+  // ━━━ モーダル ━━━
+  async function openModal() {
+    document.getElementById('modal-overlay').classList.add('open');
+    if (criteriaData) return;
+    try {
+      const r = await fetch('/api/star-criteria');
+      criteriaData = await r.json();
+      let html = '';
+      Object.entries(criteriaData).forEach(([catKey, cat]) => {
+        html += `<div class="criteria-cat">
+          <div class="criteria-cat-title">${cat.icon} ${cat.name}</div>`;
+        Object.entries(cat.subs).forEach(([subName, sub]) => {
+          html += `<div class="criteria-item">
+            <div class="criteria-stars">${'★'.repeat(sub.score)}${'☆'.repeat(5-sub.score)}</div>
+            <div>
+              <div class="criteria-name">${esc(subName)}</div>
+              <div class="criteria-reason">${esc(sub.reason)}</div>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      });
+      document.getElementById('criteria-content').innerHTML = html;
+    } catch(e) {
+      document.getElementById('criteria-content').innerHTML = '取得失敗';
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+  function closeModalOutside(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  // ━━━ 応募文モーダル ━━━
+  let currentMessage = '';
+
+  async function openMsgModal(link, btn) {
+    currentMessage = '';
+    const overlay = document.getElementById('msg-modal-overlay');
+    const body = document.getElementById('msg-body');
+    const copyBtn = document.getElementById('copy-btn');
+    body.innerHTML = '<div class="msg-spinner"></div><p style="text-align:center;font-size:12px;color:#999;margin-top:8px">案件を読み込み中…30秒ほどかかります</p>';
+    copyBtn.textContent = '📋 コピーする';
+    copyBtn.classList.remove('copied');
+    overlay.classList.add('open');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ 生成中…';
+
+    try {
+      const res = await fetch('/api/generate-message?link=' + encodeURIComponent(link));
+      const data = await res.json();
+      if (data.error) {
+        body.textContent = 'エラー: ' + data.error;
+      } else {
+        currentMessage = data.message;
+        body.textContent = data.message;
+      }
+    } catch(e) {
+      body.textContent = '通信エラーが発生しました。';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✉️ 応募文を生成';
+    }
+  }
+
+  function closeMsgModal() {
+    document.getElementById('msg-modal-overlay').classList.remove('open');
+  }
+  function closeMsgModalOutside(e) {
+    if (e.target === document.getElementById('msg-modal-overlay')) closeMsgModal();
+  }
+
+  function copyMessage() {
+    if (!currentMessage) return;
+    navigator.clipboard.writeText(currentMessage).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = '✅ コピーしました！';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '📋 コピーする';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // 初期化
+  renderCatHeader('data_entry');
+  loadJobs();
+</script>
+</body>
+</html>
