@@ -388,6 +388,8 @@ def generate_message():
         return jsonify({"error": f"AI生成失敗: {e}"}), 500
 
 
+# gunicorn/直接どちらで起動しても必ずスクレイピングを開始
+threading.Thread(target=run_scraping, daemon=True).start()
+
 if __name__ == "__main__":
-    threading.Thread(target=run_scraping, daemon=True).start()
     app.run(debug=False, port=5001)
