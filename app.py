@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request
-from playwright.sync_api import sync_playwright
+import requests as http_requests
+from bs4 import BeautifulSoup
 import re
 import time
 import os
@@ -182,65 +183,62 @@ def score_job(title, description, category_key):
 
 
 def scrape_crowdworks(keyword):
-    """Playwrightを使ってCrowdWorksをスクレイピング"""
-    url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&search[keyword]={keyword}"
+    """requests + BeautifulSoup でCrowdWorksをスクレイピング"""
+    import urllib.parse
+    url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&search[keyword]={urllib.parse.quote(keyword)}"
     jobs_raw = []
 
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-            )
-            page.goto(url, wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(3000)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "ja,en;q=0.9",
+        }
+        res = http_requests.get(url, headers=headers, timeout=30)
+        res.encoding = "utf-8"
+        soup = BeautifulSoup(res.text, "html.parser")
 
-            # 実案件リンク（/public/jobs/数字）だけ取得
-            all_links = page.query_selector_all("a[href*='/public/jobs/']")
-            job_links = [
-                l for l in all_links
-                if re.search(r'/public/jobs/\d+', l.get_attribute("href") or "")
-            ]
+        # 実案件リンク（/public/jobs/数字）を取得
+        job_links = [
+            a for a in soup.find_all("a", href=True)
+            if re.search(r'/public/jobs/\d+', a["href"])
+        ]
 
-            for link_el in job_links[:30]:
-                try:
-                    title = link_el.inner_text().strip()
-                    href = link_el.get_attribute("href") or ""
-                    if not href.startswith("http"):
-                        href = "https://crowdworks.jp" + href
+        for link_el in job_links[:30]:
+            try:
+                title = link_el.get_text(strip=True)
+                href = link_el["href"]
+                if not href.startswith("http"):
+                    href = "https://crowdworks.jp" + href
 
-                    if not title or len(title) < 5:
-                        continue
-
-                    # 親要素のテキストから説明・金額を取得
-                    parent_text = link_el.evaluate(
-                        "el => el.closest('li, article, section, div') ? el.closest('li, article, section, div').innerText : ''"
-                    ) or ""
-                    parent_text = re.sub(r'\s+', ' ', parent_text).strip()
-
-                    # 説明（タイトル除去）
-                    desc = parent_text.replace(title, "").strip()[:150]
-
-                    # 金額
-                    price_match = re.search(r'[\d,]+\s*円', parent_text)
-                    price = price_match.group(0).strip() if price_match else "要確認"
-
-                    # 終了案件を除外
-                    if any(kw in parent_text for kw in CLOSED_KEYWORDS):
-                        continue
-
-                    jobs_raw.append({
-                        "title": title,
-                        "description": desc,
-                        "price": price,
-                        "link": href,
-                    })
-                except Exception:
+                if not title or len(title) < 5:
                     continue
 
-            browser.close()
+                # 親要素のテキスト取得
+                parent = link_el.find_parent(["li", "article", "section", "div"])
+                parent_text = re.sub(r'\s+', ' ', parent.get_text(separator=" ") if parent else "").strip()
+
+                # 説明
+                desc = parent_text.replace(title, "").strip()[:150]
+
+                # 金額
+                price_match = re.search(r'[\d,]+\s*円', parent_text)
+                price = price_match.group(0).strip() if price_match else "要確認"
+
+                # 終了案件を除外
+                if any(kw in parent_text for kw in CLOSED_KEYWORDS):
+                    continue
+
+                jobs_raw.append({
+                    "title": title,
+                    "description": desc,
+                    "price": price,
+                    "link": href,
+                })
+            except Exception:
+                continue
+
     except Exception as e:
-        print(f"[Playwright ERROR] {keyword}: {e}")
+        print(f"[Scraper ERROR] {keyword}: {e}")
 
     return jobs_raw
 
