@@ -1,6 +1,5 @@
 from flask import Flask, render_template, jsonify, request
 import requests as http_requests
-from bs4 import BeautifulSoup
 import re
 import time
 import os
@@ -183,59 +182,57 @@ def score_job(title, description, category_key):
 
 
 def scrape_crowdworks(keyword):
-    """requests + BeautifulSoup でCrowdWorksをスクレイピング"""
+    """Jina AI Reader経由でCrowdWorksをスクレイピング（JS対応）"""
     import urllib.parse
-    url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&search[keyword]={urllib.parse.quote(keyword)}"
+    cw_url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&search[keyword]={urllib.parse.quote(keyword)}"
+    jina_url = f"https://r.jina.ai/{cw_url}"
     jobs_raw = []
 
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "ja,en;q=0.9",
+            "Accept": "text/plain",
+            "User-Agent": "Mozilla/5.0",
         }
-        res = http_requests.get(url, headers=headers, timeout=30)
+        res = http_requests.get(jina_url, headers=headers, timeout=60)
         res.encoding = "utf-8"
-        soup = BeautifulSoup(res.text, "html.parser")
+        text = res.text
 
-        # 実案件リンク（/public/jobs/数字）を取得
-        job_links = [
-            a for a in soup.find_all("a", href=True)
-            if re.search(r'/public/jobs/\d+', a["href"])
-        ]
+        # マークダウン形式のリンク [タイトル](URL) から案件を抽出
+        links = re.findall(
+            r'\[([^\]]{5,})\]\(https://crowdworks\.jp/public/jobs/(\d+)[^\)]*\)',
+            text
+        )
 
-        for link_el in job_links[:30]:
-            try:
-                title = link_el.get_text(strip=True)
-                href = link_el["href"]
-                if not href.startswith("http"):
-                    href = "https://crowdworks.jp" + href
-
-                if not title or len(title) < 5:
-                    continue
-
-                # 親要素のテキスト取得
-                parent = link_el.find_parent(["li", "article", "section", "div"])
-                parent_text = re.sub(r'\s+', ' ', parent.get_text(separator=" ") if parent else "").strip()
-
-                # 説明
-                desc = parent_text.replace(title, "").strip()[:150]
-
-                # 金額
-                price_match = re.search(r'[\d,]+\s*円', parent_text)
-                price = price_match.group(0).strip() if price_match else "要確認"
-
-                # 終了案件を除外
-                if any(kw in parent_text for kw in CLOSED_KEYWORDS):
-                    continue
-
-                jobs_raw.append({
-                    "title": title,
-                    "description": desc,
-                    "price": price,
-                    "link": href,
-                })
-            except Exception:
+        seen_ids = set()
+        for title, job_id in links[:40]:
+            if job_id in seen_ids:
                 continue
+            seen_ids.add(job_id)
+
+            title = title.strip()
+            if not title or len(title) < 5:
+                continue
+
+            href = f"https://crowdworks.jp/public/jobs/{job_id}"
+
+            # タイトル周辺のテキストから金額を探す
+            idx = text.find(title)
+            snippet = text[idx:idx+300] if idx != -1 else ""
+            price_match = re.search(r'[\d,]+\s*円', snippet)
+            price = price_match.group(0).strip() if price_match else "要確認"
+
+            # 終了案件を除外
+            if any(kw in snippet for kw in CLOSED_KEYWORDS):
+                continue
+
+            desc = re.sub(r'\s+', ' ', snippet.replace(title, "")).strip()[:150]
+
+            jobs_raw.append({
+                "title": title,
+                "description": desc,
+                "price": price,
+                "link": href,
+            })
 
     except Exception as e:
         print(f"[Scraper ERROR] {keyword}: {e}")
