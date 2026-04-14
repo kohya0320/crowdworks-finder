@@ -11,6 +11,7 @@ app = Flask(__name__)
 _jobs_data = {cat: [] for cat in ["data_entry", "writing", "sns", "research"]}
 _is_loading = True
 _last_updated = None
+_scrape_log = []
 CACHE_TTL = 30 * 60
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -21,7 +22,7 @@ CATEGORIES = {
         "name": "データ入力",
         "icon": "🗂️",
         "description": "テキスト・Excelへの転記など繰り返し作業",
-        "search_keywords": ["データ入力", "Excel 入力", "CSV 入力", "コピペ 作業", "転記"],
+        "search_keywords": ["データ入力", "コピペ 作業"],
         "subcategories": {
             "テキスト→Excel/CSV変換": {
                 "keywords": ["テキスト", "excel", "エクセル", "csv", "変換", "スプレッドシート"],
@@ -59,7 +60,7 @@ CATEGORIES = {
         "name": "記事・ライティング",
         "icon": "✍️",
         "description": "AIで生成・量産できる文章系タスク",
-        "search_keywords": ["商品説明 文章", "記事作成", "レビュー 作成", "ライティング 定型"],
+        "search_keywords": ["商品説明 文章", "記事作成"],
         "subcategories": {
             "商品説明文": {
                 "keywords": ["商品説明", "商品紹介", "ec", "楽天", "amazon", "商品文"],
@@ -91,7 +92,7 @@ CATEGORIES = {
         "name": "SNS運用",
         "icon": "📱",
         "description": "コメント・投稿など反復的なSNS作業",
-        "search_keywords": ["SNS コメント", "SNS 運用", "Instagram 投稿", "Twitter いいね"],
+        "search_keywords": ["SNS 運用", "Instagram 投稿"],
         "subcategories": {
             "コメント回り": {
                 "keywords": ["コメント", "コメント周り", "コメント回り", "返信"],
@@ -123,7 +124,7 @@ CATEGORIES = {
         "name": "リサーチ・収集",
         "icon": "🔍",
         "description": "スクレイピングで自動化できる情報収集系",
-        "search_keywords": ["情報収集", "リスト作成", "企業リスト", "価格調査"],
+        "search_keywords": ["リスト作成", "企業リスト"],
         "subcategories": {
             "URL・リスト収集": {
                 "keywords": ["url", "リスト", "一覧", "リンク", "サイト一覧"],
@@ -243,16 +244,24 @@ def scrape_crowdworks(keyword):
 import threading
 
 def run_scraping():
-    global _jobs_data, _is_loading, _last_updated
+    global _jobs_data, _is_loading, _last_updated, _scrape_log
+    _scrape_log.append("開始")
     print("[Scraper] スクレイピング開始...", flush=True)
     result = {cat_key: [] for cat_key in CATEGORIES}
     seen_links = set()
 
     for cat_key, cat_data in CATEGORIES.items():
+        _scrape_log.append(f"{cat_data['name']} 検索中")
         print(f"[Scraper] {cat_data['name']} 検索中...", flush=True)
         for keyword in cat_data["search_keywords"]:
-            raw_jobs = scrape_crowdworks(keyword)
-            print(f"[Scraper]   '{keyword}' → {len(raw_jobs)}件", flush=True)
+            try:
+                raw_jobs = scrape_crowdworks(keyword)
+                msg = f"'{keyword}' → {len(raw_jobs)}件"
+            except Exception as e:
+                raw_jobs = []
+                msg = f"'{keyword}' ERROR: {e}"
+            _scrape_log.append(msg)
+            print(f"[Scraper]   {msg}", flush=True)
             for job in raw_jobs:
                 if job["link"] in seen_links:
                     continue
@@ -275,6 +284,7 @@ def run_scraping():
     _is_loading = False
     _last_updated = datetime.now()
     total = sum(len(v) for v in result.values())
+    _scrape_log.append(f"完了！総件数: {total}件")
     print(f"[Scraper] 完了！総件数: {total}件", flush=True)
 
     # 1時間後に自動再スクレイピング
@@ -384,6 +394,15 @@ def generate_message():
     except Exception as e:
         return jsonify({"error": f"AI生成失敗: {e}"}), 500
 
+
+@app.route("/api/debug")
+def api_debug():
+    return jsonify({
+        "loading": _is_loading,
+        "last_updated": _last_updated.isoformat() if _last_updated else None,
+        "counts": {k: len(v) for k, v in _jobs_data.items()},
+        "scrape_log": _scrape_log[-20:],
+    })
 
 # gunicorn/直接どちらで起動しても必ずスクレイピングを開始
 threading.Thread(target=run_scraping, daemon=True).start()
