@@ -194,7 +194,7 @@ def scrape_crowdworks(keyword):
             "Accept": "text/plain",
             "User-Agent": "Mozilla/5.0",
         }
-        res = http_requests.get(jina_url, headers=headers, timeout=60)
+        res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
         res.encoding = "utf-8"
         text = res.text
 
@@ -249,6 +249,16 @@ def run_scraping():
     print("[Scraper] スクレイピング開始...", flush=True)
     result = {cat_key: [] for cat_key in CATEGORIES}
     seen_links = set()
+
+    # 5分で強制終了するウォッチドッグ
+    def _watchdog():
+        time.sleep(300)
+        global _is_loading
+        if _is_loading:
+            _is_loading = False
+            _scrape_log.append("タイムアウト：5分で強制終了")
+            print("[Scraper] ウォッチドッグ: 5分タイムアウト", flush=True)
+    threading.Thread(target=_watchdog, daemon=True).start()
 
     try:
         for cat_key, cat_data in CATEGORIES.items():
