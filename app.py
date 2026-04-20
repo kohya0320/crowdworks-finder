@@ -250,42 +250,47 @@ def run_scraping():
     result = {cat_key: [] for cat_key in CATEGORIES}
     seen_links = set()
 
-    for cat_key, cat_data in CATEGORIES.items():
-        _scrape_log.append(f"{cat_data['name']} 検索中")
-        print(f"[Scraper] {cat_data['name']} 検索中...", flush=True)
-        for keyword in cat_data["search_keywords"]:
-            try:
-                raw_jobs = scrape_crowdworks(keyword)
-                msg = f"'{keyword}' → {len(raw_jobs)}件"
-            except Exception as e:
-                raw_jobs = []
-                msg = f"'{keyword}' ERROR: {e}"
-            _scrape_log.append(msg)
-            print(f"[Scraper]   {msg}", flush=True)
-            for job in raw_jobs:
-                if job["link"] in seen_links:
-                    continue
-                seen_links.add(job["link"])
-                score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
-                result[cat_key].append({
-                    **job,
-                    "score": score,
-                    "subcategory": sub,
-                    "tip": tip,
-                    "star_reason": reason,
-                    "needs_interview": needs_interview,
-                    "category": cat_key,
-                })
-            time.sleep(1)
-        result[cat_key].sort(key=lambda x: x["score"], reverse=True)
-        print(f"[Scraper]   → {len(result[cat_key])}件確定", flush=True)
+    try:
+        for cat_key, cat_data in CATEGORIES.items():
+            _scrape_log.append(f"{cat_data['name']} 検索中")
+            print(f"[Scraper] {cat_data['name']} 検索中...", flush=True)
+            for keyword in cat_data["search_keywords"]:
+                try:
+                    raw_jobs = scrape_crowdworks(keyword)
+                    msg = f"'{keyword}' → {len(raw_jobs)}件"
+                except Exception as e:
+                    raw_jobs = []
+                    msg = f"'{keyword}' ERROR: {e}"
+                _scrape_log.append(msg)
+                print(f"[Scraper]   {msg}", flush=True)
+                for job in raw_jobs:
+                    if job["link"] in seen_links:
+                        continue
+                    seen_links.add(job["link"])
+                    score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
+                    result[cat_key].append({
+                        **job,
+                        "score": score,
+                        "subcategory": sub,
+                        "tip": tip,
+                        "star_reason": reason,
+                        "needs_interview": needs_interview,
+                        "category": cat_key,
+                    })
+                time.sleep(1)
+            result[cat_key].sort(key=lambda x: x["score"], reverse=True)
+            print(f"[Scraper]   → {len(result[cat_key])}件確定", flush=True)
 
-    _jobs_data = result
-    _is_loading = False
-    _last_updated = datetime.now()
-    total = sum(len(v) for v in result.values())
-    _scrape_log.append(f"完了！総件数: {total}件")
-    print(f"[Scraper] 完了！総件数: {total}件", flush=True)
+        _jobs_data = result
+        _last_updated = datetime.now()
+        total = sum(len(v) for v in result.values())
+        _scrape_log.append(f"完了！総件数: {total}件")
+        print(f"[Scraper] 完了！総件数: {total}件", flush=True)
+    except Exception as e:
+        _scrape_log.append(f"致命的エラー: {e}")
+        print(f"[Scraper] 致命的エラー: {e}", flush=True)
+    finally:
+        _is_loading = False
 
     # 1時間後に自動再スクレイピング
     def _auto_refresh():
