@@ -194,6 +194,9 @@ def scrape_crowdworks(keyword):
             "Accept": "text/plain",
             "User-Agent": "Mozilla/5.0",
         }
+        jina_key = os.environ.get("JINA_API_KEY", "")
+        if jina_key:
+            headers["Authorization"] = f"Bearer {jina_key}"
         res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
         res.encoding = "utf-8"
         text = res.text
