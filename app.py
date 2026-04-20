@@ -242,54 +242,57 @@ def scrape_crowdworks(keyword):
 
 
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def run_scraping():
     global _jobs_data, _is_loading, _last_updated, _scrape_log
+    _scrape_log.clear()
     _scrape_log.append("開始")
-    print("[Scraper] スクレイピング開始...", flush=True)
+    print("[Scraper] スクレイピング開始（並列）...", flush=True)
     result = {cat_key: [] for cat_key in CATEGORIES}
     seen_links = set()
+    lock = threading.Lock()
 
-    # 5分で強制終了するウォッチドッグ
-    def _watchdog():
-        time.sleep(300)
-        global _is_loading
-        if _is_loading:
-            _is_loading = False
-            _scrape_log.append("タイムアウト：5分で強制終了")
-            print("[Scraper] ウォッチドッグ: 5分タイムアウト", flush=True)
-    threading.Thread(target=_watchdog, daemon=True).start()
+    # タスク一覧: (cat_key, keyword)
+    tasks = [
+        (cat_key, kw)
+        for cat_key, cat_data in CATEGORIES.items()
+        for kw in cat_data["search_keywords"]
+    ]
+
+    def fetch_task(cat_key, keyword):
+        try:
+            raw_jobs = scrape_crowdworks(keyword)
+            return cat_key, keyword, raw_jobs, None
+        except Exception as e:
+            return cat_key, keyword, [], str(e)
 
     try:
-        for cat_key, cat_data in CATEGORIES.items():
-            _scrape_log.append(f"{cat_data['name']} 検索中")
-            print(f"[Scraper] {cat_data['name']} 検索中...", flush=True)
-            for keyword in cat_data["search_keywords"]:
-                try:
-                    raw_jobs = scrape_crowdworks(keyword)
-                    msg = f"'{keyword}' → {len(raw_jobs)}件"
-                except Exception as e:
-                    raw_jobs = []
-                    msg = f"'{keyword}' ERROR: {e}"
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {executor.submit(fetch_task, cat_key, kw): (cat_key, kw) for cat_key, kw in tasks}
+            for future in as_completed(futures, timeout=60):
+                cat_key, keyword, raw_jobs, err = future.result()
+                msg = f"'{keyword}' → {len(raw_jobs)}件" if not err else f"'{keyword}' ERROR: {err}"
                 _scrape_log.append(msg)
-                print(f"[Scraper]   {msg}", flush=True)
-                for job in raw_jobs:
-                    if job["link"] in seen_links:
-                        continue
-                    seen_links.add(job["link"])
-                    score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
-                    result[cat_key].append({
-                        **job,
-                        "score": score,
-                        "subcategory": sub,
-                        "tip": tip,
-                        "star_reason": reason,
-                        "needs_interview": needs_interview,
-                        "category": cat_key,
-                    })
-                time.sleep(1)
+                print(f"[Scraper] {msg}", flush=True)
+                with lock:
+                    for job in raw_jobs:
+                        if job["link"] in seen_links:
+                            continue
+                        seen_links.add(job["link"])
+                        score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
+                        result[cat_key].append({
+                            **job,
+                            "score": score,
+                            "subcategory": sub,
+                            "tip": tip,
+                            "star_reason": reason,
+                            "needs_interview": needs_interview,
+                            "category": cat_key,
+                        })
+
+        for cat_key in result:
             result[cat_key].sort(key=lambda x: x["score"], reverse=True)
-            print(f"[Scraper]   → {len(result[cat_key])}件確定", flush=True)
 
         _jobs_data = result
         _last_updated = datetime.now()
