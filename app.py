@@ -270,42 +270,41 @@ def run_scraping():
         except Exception as e:
             return cat_key, keyword, [], str(e)
 
+    executor = ThreadPoolExecutor(max_workers=8)
     try:
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            futures = {executor.submit(fetch_task, cat_key, kw): (cat_key, kw) for cat_key, kw in tasks}
-            for future in as_completed(futures, timeout=60):
-                cat_key, keyword, raw_jobs, err = future.result()
-                msg = f"'{keyword}' → {len(raw_jobs)}件" if not err else f"'{keyword}' ERROR: {err}"
-                _scrape_log.append(msg)
-                print(f"[Scraper] {msg}", flush=True)
-                with lock:
-                    for job in raw_jobs:
-                        if job["link"] in seen_links:
-                            continue
-                        seen_links.add(job["link"])
-                        score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
-                        result[cat_key].append({
-                            **job,
-                            "score": score,
-                            "subcategory": sub,
-                            "tip": tip,
-                            "star_reason": reason,
-                            "needs_interview": needs_interview,
-                            "category": cat_key,
-                        })
-
+        futures = {executor.submit(fetch_task, cat_key, kw): (cat_key, kw) for cat_key, kw in tasks}
+        for future in as_completed(futures, timeout=60):
+            cat_key, keyword, raw_jobs, err = future.result()
+            msg = f"'{keyword}' → {len(raw_jobs)}件" if not err else f"'{keyword}' ERROR: {err}"
+            _scrape_log.append(msg)
+            print(f"[Scraper] {msg}", flush=True)
+            with lock:
+                for job in raw_jobs:
+                    if job["link"] in seen_links:
+                        continue
+                    seen_links.add(job["link"])
+                    score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
+                    result[cat_key].append({
+                        **job,
+                        "score": score,
+                        "subcategory": sub,
+                        "tip": tip,
+                        "star_reason": reason,
+                        "needs_interview": needs_interview,
+                        "category": cat_key,
+                    })
+    except Exception as e:
+        _scrape_log.append(f"タイムアウト or エラー: {e}")
+        print(f"[Scraper] タイムアウト or エラー: {e}", flush=True)
+    finally:
+        executor.shutdown(wait=False)  # ハングしたスレッドを待たずに終了
         for cat_key in result:
             result[cat_key].sort(key=lambda x: x["score"], reverse=True)
-
         _jobs_data = result
         _last_updated = datetime.now()
         total = sum(len(v) for v in result.values())
-        _scrape_log.append(f"完了！総件数: {total}件")
-        print(f"[Scraper] 完了！総件数: {total}件", flush=True)
-    except Exception as e:
-        _scrape_log.append(f"致命的エラー: {e}")
-        print(f"[Scraper] 致命的エラー: {e}", flush=True)
-    finally:
+        _scrape_log.append(f"完了（取得件数: {total}件）")
+        print(f"[Scraper] 完了 総件数: {total}件", flush=True)
         _is_loading = False
 
     # 1時間後に自動再スクレイピング
