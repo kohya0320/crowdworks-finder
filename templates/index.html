@@ -421,20 +421,55 @@
     if (allJobs) renderJobs(tab);
   }
 
+  function showFetchButton() {
+    document.getElementById('jobs-area').innerHTML = `
+      <div class="empty">
+        <div class="emoji">🔍</div>
+        <p>ボタンを押してCrowdWorksの案件を取得します</p>
+        <button onclick="startFetch()" style="margin-top:16px;padding:12px 28px;background:var(--orange);color:#fff;border:none;border-radius:24px;font-size:14px;font-weight:700;cursor:pointer;">案件を取得する</button>
+      </div>`;
+  }
+
+  async function startFetch() {
+    document.getElementById('jobs-area').innerHTML = `
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>CrowdWorksから案件を取得中…<br>
+        <small style="color:#ccc">完了まで30秒ほどかかります</small></p>
+      </div>`;
+    await fetch('/api/refresh');
+    pollJobs();
+  }
+
+  function pollJobs() {
+    setTimeout(async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        const data = await res.json();
+        if (data.loading) {
+          pollJobs();
+          return;
+        }
+        allJobs = data.jobs;
+        renderJobs(currentTab);
+      } catch(e) {
+        document.getElementById('jobs-area').innerHTML =
+          `<div class="error-box">⚠️ 取得に失敗しました。<button onclick="showFetchButton()" style="margin-left:8px;text-decoration:underline;background:none;border:none;cursor:pointer;color:#DC2626;">戻る</button></div>`;
+      }
+    }, 3000);
+  }
+
   async function loadJobs() {
     try {
       const res = await fetch('/api/jobs');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       if (data.loading) {
-        // まだ取得中 → 10秒後に再ポーリング
-        document.getElementById('jobs-area').innerHTML = `
-          <div class="loading">
-            <div class="spinner"></div>
-            <p>CrowdWorksから案件を取得中…<br>
-            <small style="color:#ccc">完了まで1〜2分かかります</small></p>
-          </div>`;
-        setTimeout(loadJobs, 10000);
+        pollJobs();
+        return;
+      }
+      if (!data.last_updated) {
+        showFetchButton();
         return;
       }
       allJobs = data.jobs;

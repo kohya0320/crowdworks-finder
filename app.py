@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 # 結果格納
 _jobs_data = {cat: [] for cat in ["data_entry", "writing", "sns", "research"]}
-_is_loading = True
+_is_loading = False
 _last_updated = None
 _scrape_log = []
 CACHE_TTL = 30 * 60
@@ -423,9 +423,6 @@ def api_debug():
         "counts": {k: len(v) for k, v in _jobs_data.items()},
         "scrape_log": _scrape_log[-20:],
     })
-
-# gunicorn/直接どちらで起動しても必ずスクレイピングを開始
-threading.Thread(target=run_scraping, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(debug=False, port=5001)
