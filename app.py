@@ -60,7 +60,7 @@ CATEGORIES = {
         "name": "記事・ライティング",
         "icon": "✍️",
         "description": "AIで生成・量産できる文章系タスク",
-        "search_keywords": ["商品説明 文章", "記事作成"],
+        "search_keywords": ["ライティング", "商品説明 文章", "記事作成"],
         "subcategories": {
             "商品説明文": {
                 "keywords": ["商品説明", "商品紹介", "ec", "楽天", "amazon", "商品文"],
@@ -92,7 +92,7 @@ CATEGORIES = {
         "name": "SNS運用",
         "icon": "📱",
         "description": "コメント・投稿など反復的なSNS作業",
-        "search_keywords": ["SNS 運用", "Instagram 投稿"],
+        "search_keywords": ["SNS運用", "Instagram 投稿"],
         "subcategories": {
             "コメント回り": {
                 "keywords": ["コメント", "コメント周り", "コメント回り", "返信"],
