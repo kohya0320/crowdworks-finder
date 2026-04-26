@@ -182,64 +182,64 @@ def score_job(title, description, category_key):
     return best_score, best_sub, best_tip, best_reason, needs_interview
 
 
-def scrape_crowdworks(keyword):
-    """Jina AI Reader経由でCrowdWorksをスクレイピング（JS対応）"""
+def scrape_crowdworks(keyword, pages=3):
+    """Jina AI Reader経由でCrowdWorksをスクレイピング（複数ページ対応）"""
     import urllib.parse
-    cw_url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&search[keyword]={urllib.parse.quote(keyword)}"
-    jina_url = f"https://r.jina.ai/{cw_url}"
     jobs_raw = []
+    seen_ids = set()
 
-    try:
-        headers = {
-            "Accept": "text/plain",
-            "User-Agent": "Mozilla/5.0",
-        }
-        jina_key = os.environ.get("JINA_API_KEY", "")
-        if jina_key:
-            headers["Authorization"] = f"Bearer {jina_key}"
-        res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
-        res.encoding = "utf-8"
-        text = res.text
+    headers = {
+        "Accept": "text/plain",
+        "User-Agent": "Mozilla/5.0",
+    }
+    jina_key = os.environ.get("JINA_API_KEY", "")
+    if jina_key:
+        headers["Authorization"] = f"Bearer {jina_key}"
 
-        # マークダウン形式のリンク [タイトル](URL) から案件を抽出
-        links = re.findall(
-            r'\[([^\]]{5,})\]\(https://crowdworks\.jp/public/jobs/(\d+)[^\)]*\)',
-            text
-        )
+    for page in range(1, pages + 1):
+        cw_url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&page={page}&search[keyword]={urllib.parse.quote(keyword)}"
+        jina_url = f"https://r.jina.ai/{cw_url}"
+        try:
+            res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
+            res.encoding = "utf-8"
+            text = res.text
 
-        seen_ids = set()
-        for title, job_id in links[:40]:
-            if job_id in seen_ids:
-                continue
-            seen_ids.add(job_id)
+            links = re.findall(
+                r'\[([^\]]{5,})\]\(https://crowdworks\.jp/public/jobs/(\d+)[^\)]*\)',
+                text
+            )
 
-            title = title.strip()
-            if not title or len(title) < 5:
-                continue
+            for title, job_id in links:
+                if job_id in seen_ids:
+                    continue
+                seen_ids.add(job_id)
 
-            href = f"https://crowdworks.jp/public/jobs/{job_id}"
+                title = title.strip()
+                if not title or len(title) < 5:
+                    continue
 
-            # タイトル周辺のテキストから金額を探す
-            idx = text.find(title)
-            snippet = text[idx:idx+300] if idx != -1 else ""
-            price_match = re.search(r'[\d,]+\s*円', snippet)
-            price = price_match.group(0).strip() if price_match else "要確認"
+                href = f"https://crowdworks.jp/public/jobs/{job_id}"
 
-            # 終了案件を除外
-            if any(kw in snippet for kw in CLOSED_KEYWORDS):
-                continue
+                idx = text.find(title)
+                snippet = text[idx:idx+300] if idx != -1 else ""
+                price_match = re.search(r'[\d,]+\s*円', snippet)
+                price = price_match.group(0).strip() if price_match else "要確認"
 
-            desc = re.sub(r'\s+', ' ', snippet.replace(title, "")).strip()[:150]
+                if any(kw in snippet for kw in CLOSED_KEYWORDS):
+                    continue
 
-            jobs_raw.append({
-                "title": title,
-                "description": desc,
-                "price": price,
-                "link": href,
-            })
+                desc = re.sub(r'\s+', ' ', snippet.replace(title, "")).strip()[:150]
 
-    except Exception as e:
-        print(f"[Scraper ERROR] {keyword}: {e}")
+                jobs_raw.append({
+                    "title": title,
+                    "description": desc,
+                    "price": price,
+                    "link": href,
+                })
+
+        except Exception as e:
+            print(f"[Scraper ERROR] {keyword} page={page}: {e}")
+            break
 
     return jobs_raw
 
