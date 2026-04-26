@@ -22,7 +22,8 @@ CATEGORIES = {
         "name": "自動化・スクリプト",
         "icon": "🤖",
         "description": "Python・GAS・RPAで自動化できる開発系タスク",
-        "search_keywords": ["Python 自動化", "GAS スクリプト", "スクレイピング", "RPA"],
+        "category_ids": [370, 241],  # AIシステム開発・自動化, Web開発・システム設計
+        "core_keywords": ["python", "gas", "スクレイピング", "rpa", "自動化", "スクリプト", "api連携", "api 連携", "クローリング", "selenium", "playwright", "node.js", "typescript"],
         "subcategories": {
             "Python自動化": {
                 "keywords": ["python", "パイソン"],
@@ -60,7 +61,8 @@ CATEGORIES = {
         "name": "AI・データ処理",
         "icon": "🧠",
         "description": "ChatGPT/Claude APIや機械学習で自動化できるタスク",
-        "search_keywords": ["ChatGPT API", "OpenAI", "文字起こし 自動", "画像収集"],
+        "category_ids": [365, 283, 364],  # ChatGPT開発, AI・チャットボット, 機械学習
+        "core_keywords": ["chatgpt", "gpt", "openai", "claude", "llm", "ai api", "whisper", "文字起こし", "画像処理", "画像変換", "データ分析", "機械学習", "チャットボット", "bot"],
         "subcategories": {
             "ChatGPT・AI API活用": {
                 "keywords": ["chatgpt", "gpt", "openai", "claude", "ai api", "llm"],
@@ -92,7 +94,8 @@ CATEGORIES = {
         "name": "SNS・Bot自動化",
         "icon": "📣",
         "description": "自動投稿・LINE Bot・競合リサーチなど反復SNS作業",
-        "search_keywords": ["自動投稿", "LINE Bot", "競合リサーチ"],
+        "category_ids": [303, 133],  # Instagram・SNS集客, その他SNS運用
+        "core_keywords": ["自動投稿", "line bot", "linebot", "bot", "競合リサーチ", "競合調査", "価格調査", "価格監視", "dm 自動", "メール 自動", "自動化", "スクレイピング"],
         "subcategories": {
             "LINE Bot・自動応答": {
                 "keywords": ["line bot", "linebot", "公式ライン 自動", "line 自動応答", "チャットボット"],
@@ -124,7 +127,8 @@ CATEGORIES = {
         "name": "データ整理・変換",
         "icon": "📊",
         "description": "CSV・スプレッドシート・一括処理など構造化データの自動変換",
-        "search_keywords": ["スプレッドシート 連携", "CSV 変換", "一括作成"],
+        "category_ids": [54, 249],  # データ検索・収集, データ作成・入力
+        "core_keywords": ["csv", "スプレッドシート", "エクセル", "excel", "一括登録", "一括作成", "一括変換", "データ整形", "データ整理", "クレンジング", "自動化", "スクリプト", "python", "gas"],
         "subcategories": {
             "CSV・Excel自動処理": {
                 "keywords": ["csv 処理", "csv 変換", "csv 自動", "excel 自動", "エクセル 自動", "一括変換"],
@@ -171,9 +175,10 @@ def score_job(title, description, category_key):
     category = CATEGORIES[category_key]
     best_score = 0
     best_sub = "その他"
-    best_tip = ""
+    best_tip = "詳細を確認して自動化できるか判断してください。"
     best_reason = ""
 
+    # サブカテゴリキーワードマッチでスコアアップ
     for sub_name, sub_data in category["subcategories"].items():
         matches = sum(1 for kw in sub_data["keywords"] if kw in text)
         if matches > 0 and sub_data["score"] > best_score:
@@ -182,12 +187,17 @@ def score_job(title, description, category_key):
             best_tip = sub_data["tip"]
             best_reason = sub_data.get("star_reason", "")
 
+    # サブカテゴリ未マッチでもコアキーワードがあれば★4
+    if best_score < MIN_SCORE:
+        core_kws = category.get("core_keywords", [])
+        if any(kw in text for kw in core_kws):
+            best_score = MIN_SCORE
+
     return best_score, best_sub, best_tip, best_reason
 
 
-def scrape_crowdworks(keyword, pages=3):
-    """Jina AI Reader経由でCrowdWorksをスクレイピング（複数ページ対応）"""
-    import urllib.parse
+def scrape_category(category_id, pages=2):
+    """カテゴリページからCrowdWorksの案件を取得"""
     jobs_raw = []
     seen_ids = set()
 
@@ -200,7 +210,7 @@ def scrape_crowdworks(keyword, pages=3):
         headers["Authorization"] = f"Bearer {jina_key}"
 
     for page in range(1, pages + 1):
-        cw_url = f"https://crowdworks.jp/public/jobs/search?job_type=fixed&order=new&page={page}&search[keyword]={urllib.parse.quote(keyword)}"
+        cw_url = f"https://crowdworks.jp/public/jobs/category/{category_id}?job_type=fixed&order=new&page={page}"
         jina_url = f"https://r.jina.ai/{cw_url}"
         try:
             res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
@@ -241,7 +251,7 @@ def scrape_crowdworks(keyword, pages=3):
                 })
 
         except Exception as e:
-            print(f"[Scraper ERROR] {keyword} page={page}: {e}")
+            print(f"[Scraper ERROR] category={category_id} page={page}: {e}")
             break
 
     return jobs_raw
@@ -259,26 +269,26 @@ def run_scraping():
     seen_links = set()
     lock = threading.Lock()
 
-    # タスク一覧: (cat_key, keyword)
+    # タスク一覧: (cat_key, category_id)
     tasks = [
-        (cat_key, kw)
+        (cat_key, cat_id)
         for cat_key, cat_data in CATEGORIES.items()
-        for kw in cat_data["search_keywords"]
+        for cat_id in cat_data["category_ids"]
     ]
 
-    def fetch_task(cat_key, keyword):
+    def fetch_task(cat_key, cat_id):
         try:
-            raw_jobs = scrape_crowdworks(keyword)
-            return cat_key, keyword, raw_jobs, None
+            raw_jobs = scrape_category(cat_id)
+            return cat_key, cat_id, raw_jobs, None
         except Exception as e:
-            return cat_key, keyword, [], str(e)
+            return cat_key, cat_id, [], str(e)
 
     executor = ThreadPoolExecutor(max_workers=8)
     try:
-        futures = {executor.submit(fetch_task, cat_key, kw): (cat_key, kw) for cat_key, kw in tasks}
-        for future in as_completed(futures, timeout=60):
-            cat_key, keyword, raw_jobs, err = future.result()
-            msg = f"'{keyword}' → {len(raw_jobs)}件" if not err else f"'{keyword}' ERROR: {err}"
+        futures = {executor.submit(fetch_task, cat_key, cat_id): (cat_key, cat_id) for cat_key, cat_id in tasks}
+        for future in as_completed(futures, timeout=90):
+            cat_key, cat_id, raw_jobs, err = future.result()
+            msg = f"category/{cat_id} → {len(raw_jobs)}件" if not err else f"category/{cat_id} ERROR: {err}"
             _scrape_log.append(msg)
             print(f"[Scraper] {msg}", flush=True)
             with lock:
