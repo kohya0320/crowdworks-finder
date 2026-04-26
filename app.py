@@ -8,7 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # 結果格納
-_jobs_data = {cat: [] for cat in ["data_entry", "writing", "sns", "research"]}
+_jobs_data = {cat: [] for cat in ["script", "ai_data", "sns_bot", "data_transform"]}
 _is_loading = False
 _last_updated = None
 _scrape_log = []
@@ -18,155 +18,161 @@ CACHE_TTL = 30 * 60
 # カテゴリ定義 & 星付け条件
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATEGORIES = {
-    "data_entry": {
-        "name": "データ入力",
-        "icon": "🗂️",
-        "description": "テキスト・Excelへの転記など繰り返し作業",
-        "search_keywords": ["データ入力", "コピペ 作業"],
+    "script": {
+        "name": "自動化・スクリプト",
+        "icon": "🤖",
+        "description": "Python・GAS・RPAで自動化できる開発系タスク",
+        "search_keywords": ["Python 自動化", "GAS スクリプト", "スクレイピング", "RPA"],
         "subcategories": {
-            "テキスト→Excel/CSV変換": {
-                "keywords": ["テキスト", "excel", "エクセル", "csv", "変換", "スプレッドシート"],
+            "Python自動化": {
+                "keywords": ["python", "パイソン"],
                 "score": 5,
-                "tip": "Pythonで完全自動化可能。最も狙い目。",
-                "star_reason": "⭐⭐⭐⭐⭐：入力フォーマットが完全に固定。Pythonスクリプト1本で全自動。"
+                "tip": "得意領域。即提案できる。",
+                "star_reason": "⭐⭐⭐⭐⭐：Pythonスクリプトで完全自動化。最も狙い目。"
             },
-            "コピー&ペースト系": {
-                "keywords": ["コピペ", "コピー", "貼り付け", "転記"],
+            "GAS・スプレッドシート連携": {
+                "keywords": ["gas", "google apps script", "スプレッドシート 連携", "スプレッドシート自動"],
                 "score": 5,
-                "tip": "Seleniumで完全自動化可能。",
-                "star_reason": "⭐⭐⭐⭐⭐：操作が単純な繰り返し。Seleniumで全自動。"
+                "tip": "GASで完結。Claude Codeとの親和性が高い。",
+                "star_reason": "⭐⭐⭐⭐⭐：GASはClaude Codeで高速実装できる最適タスク。"
             },
-            "画像→テキスト入力(OCR)": {
-                "keywords": ["画像", "領収書", "請求書", "スキャン", "写真"],
+            "スクレイピング・データ収集": {
+                "keywords": ["スクレイピング", "クローリング", "データ収集", "自動収集"],
+                "score": 5,
+                "tip": "BeautifulSoup/Playwrightで対応。",
+                "star_reason": "⭐⭐⭐⭐⭐：スクレイピングはPythonの基本。即対応可能。"
+            },
+            "RPA・業務自動化": {
+                "keywords": ["rpa", "業務効率化", "業務自動化", "一括作成", "一括登録"],
                 "score": 4,
-                "tip": "OCR+自動入力で対応。精度確認が必要。",
-                "star_reason": "⭐⭐⭐⭐：OCR精度が課題だが自動化の枠組みは作れる。"
+                "tip": "Python代替提案が競合少なく高単価になりやすい。",
+                "star_reason": "⭐⭐⭐⭐：ツール指定があってもPython代替を提案すると差別化できる。"
             },
-            "Webリサーチ→入力": {
-                "keywords": ["リサーチ", "web", "サイト", "url", "調査"],
-                "score": 3,
-                "tip": "スクレイピングで収集→入力が可能。",
-                "star_reason": "⭐⭐⭐：サイト構造によっては難しい。要確認。"
-            },
-            "フォーム入力": {
-                "keywords": ["フォーム", "登録", "申請", "応募"],
-                "score": 3,
-                "tip": "Seleniumで自動化できるが認証が障壁になることも。",
-                "star_reason": "⭐⭐⭐：認証・CAPTCHA次第で難易度が変わる。"
+            "API連携": {
+                "keywords": ["api連携", "api 連携", "webhook", "zapier", "make"],
+                "score": 4,
+                "tip": "requestsライブラリで実装。各種SaaS対応。",
+                "star_reason": "⭐⭐⭐⭐：API仕様が公開されていれば高速実装可能。"
             },
         }
     },
-    "writing": {
-        "name": "記事・ライティング",
-        "icon": "✍️",
-        "description": "AIで生成・量産できる文章系タスク",
-        "search_keywords": ["ライティング", "商品説明 文章", "記事作成"],
+    "ai_data": {
+        "name": "AI・データ処理",
+        "icon": "🧠",
+        "description": "ChatGPT/Claude APIや機械学習で自動化できるタスク",
+        "search_keywords": ["ChatGPT API", "OpenAI", "文字起こし 自動", "画像収集"],
         "subcategories": {
-            "商品説明文": {
-                "keywords": ["商品説明", "商品紹介", "ec", "楽天", "amazon", "商品文"],
+            "ChatGPT・AI API活用": {
+                "keywords": ["chatgpt", "gpt", "openai", "claude", "ai api", "llm"],
                 "score": 5,
-                "tip": "フォーマット固定でAI量産が最も向いている。",
-                "star_reason": "⭐⭐⭐⭐⭐：商品名・スペック→説明文の変換はAIが最得意。"
+                "tip": "API実装が得意領域。高単価狙い目。",
+                "star_reason": "⭐⭐⭐⭐⭐：AI APIの実装はClaude Codeで最速対応できる。"
             },
-            "定型フォーマット記事": {
-                "keywords": ["フォーマット", "テンプレ", "定型", "ひな形", "指定"],
+            "文字起こし自動化": {
+                "keywords": ["文字起こし 自動", "whisper", "音声認識 自動", "書き起こし 自動"],
                 "score": 5,
-                "tip": "構成が固定なのでAI+スクリプトで量産可能。",
-                "star_reason": "⭐⭐⭐⭐⭐：構成が決まっているためAI生成→そのまま納品が可能。"
+                "tip": "Whisper APIで完全自動化。",
+                "star_reason": "⭐⭐⭐⭐⭐：OpenAI Whisper APIで音声→テキスト完全自動化。"
             },
-            "レビュー・口コミ": {
-                "keywords": ["レビュー", "口コミ", "感想", "評価文"],
+            "画像・動画処理": {
+                "keywords": ["画像収集", "画像変換", "画像処理", "動画 自動", "サムネイル 自動"],
                 "score": 4,
-                "tip": "AIで生成可能。ジャンルごとにテンプレ化。",
-                "star_reason": "⭐⭐⭐⭐：ジャンルを固定すればAIで量産しやすい。"
+                "tip": "Pillow/FFmpegで自動バッチ処理。",
+                "star_reason": "⭐⭐⭐⭐：バッチ処理スクリプトで大量ファイルを自動変換。"
             },
-            "SEO記事": {
-                "keywords": ["seo", "キーワード", "上位", "検索", "ブログ"],
-                "score": 3,
-                "tip": "AIで生成可能だが品質チェックが必要。",
-                "star_reason": "⭐⭐⭐：AIで下書き生成→人による確認が現実的。"
+            "データ分析・集計": {
+                "keywords": ["データ分析", "集計 自動", "レポート 自動", "pandas", "可視化"],
+                "score": 4,
+                "tip": "pandas+Pythonで自動集計・レポート生成。",
+                "star_reason": "⭐⭐⭐⭐：pandasで自動集計→グラフ生成まで全自動化可能。"
             },
         }
     },
-    "sns": {
-        "name": "SNS運用",
-        "icon": "📱",
-        "description": "コメント・投稿など反復的なSNS作業",
-        "search_keywords": ["SNS運用", "Instagram 投稿"],
+    "sns_bot": {
+        "name": "SNS・Bot自動化",
+        "icon": "📣",
+        "description": "自動投稿・LINE Bot・競合リサーチなど反復SNS作業",
+        "search_keywords": ["自動投稿", "LINE Bot", "競合リサーチ"],
         "subcategories": {
-            "コメント回り": {
-                "keywords": ["コメント", "コメント周り", "コメント回り", "返信"],
+            "LINE Bot・自動応答": {
+                "keywords": ["line bot", "linebot", "公式ライン 自動", "line 自動応答", "チャットボット"],
                 "score": 5,
-                "tip": "Selenium+AIで完全自動化可能。",
-                "star_reason": "⭐⭐⭐⭐⭐：AIでコメント文生成→Seleniumで自動投稿。完全自動化可。"
+                "tip": "LINE Messaging APIで完全自動化。",
+                "star_reason": "⭐⭐⭐⭐⭐：LINE APIで自動応答Bot。Claude Codeで高速実装可。"
             },
-            "いいね・フォロー": {
-                "keywords": ["いいね", "フォロー", "フォロワー"],
+            "SNS自動投稿": {
+                "keywords": ["自動投稿", "instagram 自動", "x 自動", "twitter 自動", "youtube 自動"],
                 "score": 5,
-                "tip": "Seleniumで自動化可能。BAN対策は必要。",
-                "star_reason": "⭐⭐⭐⭐⭐：操作が単純でSeleniumで完全自動化。BAN対策に乱数wait推奨。"
+                "tip": "各SNS公式APIで自動投稿スクリプト実装。",
+                "star_reason": "⭐⭐⭐⭐⭐：API経由の自動投稿はPythonで完全自動化できる。"
             },
-            "投稿・ポスト作成": {
-                "keywords": ["投稿", "ポスト", "発信", "運用", "コンテンツ"],
+            "競合リサーチ・価格調査": {
+                "keywords": ["競合リサーチ", "競合調査", "価格調査", "価格監視", "相場調査"],
                 "score": 4,
-                "tip": "AIで文章生成→自動投稿APIで対応。",
-                "star_reason": "⭐⭐⭐⭐：AI生成+各SNSの公式APIで自動投稿可能。"
+                "tip": "スクレイピング+定期実行で自動監視。",
+                "star_reason": "⭐⭐⭐⭐：定期スクレイピング+通知で価格監視を完全自動化。"
             },
-            "DM・メッセージ送信": {
-                "keywords": ["dm", "ダイレクト", "メッセージ送信", "message"],
+            "Webフォーム・DM自動送信": {
+                "keywords": ["dm 自動", "メール 自動", "フォーム 自動", "問い合わせ 自動"],
                 "score": 4,
-                "tip": "AI+自動送信スクリプトで対応可能。",
-                "star_reason": "⭐⭐⭐⭐：テンプレ+パーソナライズでAI生成→Selenium送信。"
+                "tip": "Selenium+テンプレートで自動送信。",
+                "star_reason": "⭐⭐⭐⭐：テンプレ文+自動送信スクリプトで効率化。"
             },
         }
     },
-    "research": {
-        "name": "リサーチ・収集",
-        "icon": "🔍",
-        "description": "スクレイピングで自動化できる情報収集系",
-        "search_keywords": ["リスト作成", "企業リスト"],
+    "data_transform": {
+        "name": "データ整理・変換",
+        "icon": "📊",
+        "description": "CSV・スプレッドシート・一括処理など構造化データの自動変換",
+        "search_keywords": ["スプレッドシート 連携", "CSV 変換", "一括作成"],
         "subcategories": {
-            "URL・リスト収集": {
-                "keywords": ["url", "リスト", "一覧", "リンク", "サイト一覧"],
+            "CSV・Excel自動処理": {
+                "keywords": ["csv 処理", "csv 変換", "csv 自動", "excel 自動", "エクセル 自動", "一括変換"],
                 "score": 5,
-                "tip": "スクレイピングで完全自動化。最も向いている。",
-                "star_reason": "⭐⭐⭐⭐⭐：スクレイピングの基本作業。Pythonで数分で終わる。"
+                "tip": "pandasで数行のコードで完結。最速納品できる。",
+                "star_reason": "⭐⭐⭐⭐⭐：pandasでCSV/Excel処理は最も得意な領域。"
             },
-            "企業・店舗情報収集": {
-                "keywords": ["企業", "会社", "法人", "店舗", "事業者"],
-                "score": 4,
-                "tip": "Webスクレイピングで自動収集可能。",
-                "star_reason": "⭐⭐⭐⭐：対象サイトが決まれば自動収集スクリプトで対応。"
+            "スプレッドシート自動化": {
+                "keywords": ["スプレッドシート", "google sheets", "gスプレッド", "シート 自動"],
+                "score": 5,
+                "tip": "GAS or Python gspreadで完全自動化。",
+                "star_reason": "⭐⭐⭐⭐⭐：GAS/gspreadでスプレッドシート操作を完全自動化。"
             },
-            "価格・在庫調査": {
-                "keywords": ["価格", "値段", "在庫", "競合", "相場"],
+            "一括登録・一括作成": {
+                "keywords": ["一括登録", "一括作成", "一括入力", "一括更新", "バッチ処理"],
                 "score": 4,
-                "tip": "定期実行スクリプトで自動化可能。",
-                "star_reason": "⭐⭐⭐⭐：EC系サイトなら構造が一定でスクレイピングしやすい。"
+                "tip": "スクリプトでループ処理→全自動。",
+                "star_reason": "⭐⭐⭐⭐：繰り返し処理はスクリプトで全自動化できる。"
             },
-            "画像・素材収集": {
-                "keywords": ["画像", "素材", "写真", "ダウンロード", "収集"],
+            "データ整形・クレンジング": {
+                "keywords": ["データ整形", "データ整理", "クレンジング", "名寄せ", "重複削除"],
                 "score": 4,
-                "tip": "自動ダウンロードスクリプトで対応。",
-                "star_reason": "⭐⭐⭐⭐：URLがわかれば自動ダウンロード+リネームで完全自動。"
+                "tip": "pandasで自動整形。件数が多いほど価値が高い。",
+                "star_reason": "⭐⭐⭐⭐：pandasで自動整形→納品。件数×単価で高収益になりやすい。"
             },
         }
     }
 }
 
 
-INTERVIEW_KEYWORDS = ["面接", "面談", "zoom", "zoomにて", "オンライン面接", "ビデオ通話",
-                      "google meet", "teams", "skype", "電話面談", "事前面談", "ヒアリング"]
-
 CLOSED_KEYWORDS = ["受付終了", "募集終了", "応募終了", "締め切り済", "終了しました", "受付を終了"]
+
+# ★4未満は表示しない
+MIN_SCORE = 4
+
+# 除外キーワード（これがあれば非表示）
+EXCLUDE_KEYWORDS = [
+    "ai禁止", "chatgpt禁止", "aiツール不可", "ai不可", "ai使用禁止",
+    "スマホのみ", "スマホ限定", "pc不可",
+]
 
 def score_job(title, description, category_key):
     text = (title + " " + description).lower()
     category = CATEGORIES[category_key]
-    best_score = 3   # 検索でヒットした時点で最低⭐3
+    best_score = 0
     best_sub = "その他"
-    best_tip = "カテゴリに合致。詳細を確認して自動化できるか判断してください。"
-    best_reason = "⭐⭐⭐：検索キーワードに合致。内容確認で自動化の可否を判断。"
+    best_tip = ""
+    best_reason = ""
 
     for sub_name, sub_data in category["subcategories"].items():
         matches = sum(1 for kw in sub_data["keywords"] if kw in text)
@@ -176,10 +182,7 @@ def score_job(title, description, category_key):
             best_tip = sub_data["tip"]
             best_reason = sub_data.get("star_reason", "")
 
-    # 面接・Zoom必要かチェック
-    needs_interview = any(kw in text for kw in INTERVIEW_KEYWORDS)
-
-    return best_score, best_sub, best_tip, best_reason, needs_interview
+    return best_score, best_sub, best_tip, best_reason
 
 
 def scrape_crowdworks(keyword, pages=3):
@@ -283,14 +286,25 @@ def run_scraping():
                     if job["link"] in seen_links:
                         continue
                     seen_links.add(job["link"])
-                    score, sub, tip, reason, needs_interview = score_job(job["title"], job["description"], cat_key)
+
+                    combined = (job["title"] + " " + job["description"]).lower()
+
+                    # 除外キーワードチェック
+                    if any(kw in combined for kw in EXCLUDE_KEYWORDS):
+                        continue
+
+                    score, sub, tip, reason = score_job(job["title"], job["description"], cat_key)
+
+                    # ★4未満は表示しない
+                    if score < MIN_SCORE:
+                        continue
+
                     result[cat_key].append({
                         **job,
                         "score": score,
                         "subcategory": sub,
                         "tip": tip,
                         "star_reason": reason,
-                        "needs_interview": needs_interview,
                         "category": cat_key,
                     })
     except Exception as e:

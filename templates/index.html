@@ -276,10 +276,10 @@
 
 <!-- タブ -->
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('data_entry')" id="tab-data_entry">🗂️ データ入力</button>
-  <button class="tab-btn" onclick="switchTab('writing')" id="tab-writing">✍️ ライティング</button>
-  <button class="tab-btn" onclick="switchTab('sns')" id="tab-sns">📱 SNS運用</button>
-  <button class="tab-btn" onclick="switchTab('research')" id="tab-research">🔍 リサーチ</button>
+  <button class="tab-btn active" onclick="switchTab('script')" id="tab-script">🤖 自動化・スクリプト</button>
+  <button class="tab-btn" onclick="switchTab('ai_data')" id="tab-ai_data">🧠 AI・データ処理</button>
+  <button class="tab-btn" onclick="switchTab('sns_bot')" id="tab-sns_bot">📣 SNS・Bot</button>
+  <button class="tab-btn" onclick="switchTab('data_transform')" id="tab-data_transform">📊 データ変換</button>
 </div>
 
 <!-- カテゴリ説明 -->
@@ -297,7 +297,7 @@
 </div>
 
 <footer>
-  ⭐5=完全自動化可 / ⭐4=ほぼ自動化可 / ⭐3=部分的に自動化可 ｜ データは30分キャッシュ
+  ⭐5=即対応可・高単価狙い / ⭐4=自動化可 ｜ AI禁止・スマホ限定は除外済
 </footer>
 
 <!-- ━━━ 応募文モーダル ━━━ -->
@@ -323,10 +323,10 @@
 
 <script>
   const CAT_META = {
-    data_entry: { icon: '🗂️', name: 'データ入力', desc: 'テキスト・Excelへの転記など繰り返し作業。Pythonで完全自動化できるものが多い。' },
-    writing:    { icon: '✍️', name: '記事・ライティング', desc: 'AIで生成・量産できる文章系タスク。フォーマット固定だと特に自動化しやすい。' },
-    sns:        { icon: '📱', name: 'SNS運用', desc: 'コメント・投稿など反復的なSNS作業。Selenium+AIで効率化しやすい。' },
-    research:   { icon: '🔍', name: 'リサーチ・収集', desc: 'スクレイピングで自動化できる情報収集系。URL・リスト収集が最も向いている。' },
+    script:         { icon: '🤖', name: '自動化・スクリプト', desc: 'Python・GAS・RPAで自動化できる開発系タスク。最も得意領域。' },
+    ai_data:        { icon: '🧠', name: 'AI・データ処理', desc: 'ChatGPT/Claude APIや文字起こし・画像処理など。API実装で高単価狙い。' },
+    sns_bot:        { icon: '📣', name: 'SNS・Bot自動化', desc: '自動投稿・LINE Bot・競合リサーチ。API連携で完全自動化できる。' },
+    data_transform: { icon: '📊', name: 'データ整理・変換', desc: 'CSV・スプレッドシート・一括処理。pandasで最速納品できる。' },
   };
 
   let allJobs = null;
@@ -569,7 +569,7 @@
   }
 
   // 初期化
-  renderCatHeader('data_entry');
+  renderCatHeader('script');
   loadJobs();
 </script>
 </body>
