@@ -155,6 +155,20 @@ CATEGORIES = {
 
 CLOSED_KEYWORDS = ["受付終了", "募集終了", "応募終了", "締め切り済", "終了しました", "受付を終了"]
 
+BEGINNER_OK_KEYWORDS = ["初心者ok", "初心者歓迎", "未経験ok", "未経験歓迎", "未経験可", "未経験者歓迎", "初めてでも", "初心者でも"]
+INTERVIEW_KEYWORDS   = ["面接", "面談", "zoom", "google meet", "teams", "skype", "ビデオ通話", "オンライン面接", "zoomにて"]
+ONGOING_KEYWORDS     = ["継続", "長期", "月額", "定期依頼", "継続案件", "長期依頼", "継続的"]
+ALLOWS_AI_KEYWORDS   = ["chatgptok", "chatgpt ok", "ai ok", "aiok", "ai使用可", "ai活用ok", "chatgpt使用", "生成ai ok", "生成aiok", "aiツール使用可"]
+
+def detect_flags(title, description):
+    text = (title + " " + description).lower()
+    return {
+        "beginner_ok":    any(kw in text for kw in BEGINNER_OK_KEYWORDS),
+        "needs_interview": any(kw in text for kw in INTERVIEW_KEYWORDS),
+        "is_ongoing":     any(kw in text for kw in ONGOING_KEYWORDS),
+        "allows_ai":      any(kw in text for kw in ALLOWS_AI_KEYWORDS),
+    }
+
 # ★4未満は表示しない
 MIN_SCORE = 4
 
@@ -306,6 +320,8 @@ def run_scraping():
                     if score < MIN_SCORE:
                         continue
 
+                    flags = detect_flags(job["title"], job["description"])
+
                     result[cat_key].append({
                         **job,
                         "score": score,
@@ -313,6 +329,7 @@ def run_scraping():
                         "tip": tip,
                         "star_reason": reason,
                         "category": cat_key,
+                        **flags,
                     })
     except Exception as e:
         _scrape_log.append(f"タイムアウト or エラー: {e}")

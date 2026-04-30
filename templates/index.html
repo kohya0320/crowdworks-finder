@@ -71,8 +71,31 @@
     .tab-btn.active { background: var(--orange); color: #fff; border-color: var(--orange); box-shadow: 0 4px 14px rgba(255,107,53,0.35); }
     .tab-btn:not(.active):hover { border-color: var(--orange3); color: var(--orange); }
 
+    /* 絞り込みバー */
+    .filter-bar {
+      padding: 10px 16px 0; max-width: 840px; margin: 0 auto;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .filter-label { font-size: 11px; color: var(--gray); font-weight: 600; margin-right: 2px; }
+    .filter-chip {
+      padding: 5px 12px; border-radius: 20px;
+      border: 1.5px solid #E5E7EB; background: var(--white);
+      font-size: 12px; font-weight: 600; color: var(--gray);
+      cursor: pointer; transition: all 0.18s; white-space: nowrap;
+    }
+    .filter-chip.active { background: var(--dark); color: #fff; border-color: var(--dark); }
+    .filter-chip.active.danger { background: #DC2626; border-color: #DC2626; }
+    .filter-chip.active.green { background: #16a34a; border-color: #16a34a; }
+    .filter-chip.active.blue  { background: #2563eb; border-color: #2563eb; }
+    .price-select {
+      padding: 5px 10px; border-radius: 20px;
+      border: 1.5px solid #E5E7EB; background: var(--white);
+      font-size: 12px; font-weight: 600; color: var(--gray);
+      cursor: pointer; outline: none;
+    }
+
     /* カテゴリ説明 */
-    .cat-header { padding: 14px 16px 6px; max-width: 840px; margin: 0 auto; }
+    .cat-header { padding: 10px 16px 6px; max-width: 840px; margin: 0 auto; }
     .cat-desc {
       background: var(--white); border-radius: var(--r);
       padding: 14px 16px; border-left: 4px solid var(--orange);
@@ -282,6 +305,22 @@
   <button class="tab-btn" onclick="switchTab('data_transform')" id="tab-data_transform">📊 データ変換</button>
 </div>
 
+<!-- 絞り込みバー -->
+<div class="filter-bar">
+  <span class="filter-label">絞り込み：</span>
+  <button class="filter-chip" id="f-beginner" onclick="toggleFilter('beginner_ok')">🔰 初心者可のみ</button>
+  <button class="filter-chip danger" id="f-interview" onclick="toggleFilter('no_interview')">🚫 面接なし</button>
+  <button class="filter-chip green" id="f-ongoing" onclick="toggleFilter('is_ongoing')">🔄 継続案件のみ</button>
+  <button class="filter-chip blue" id="f-ai" onclick="toggleFilter('allows_ai')">🤖 AI使用OK</button>
+  <select class="price-select" id="f-price" onchange="applyFilters()">
+    <option value="0">💰 単価下限なし</option>
+    <option value="1000">💰 1,000円以上</option>
+    <option value="5000">💰 5,000円以上</option>
+    <option value="10000">💰 10,000円以上</option>
+    <option value="30000">💰 30,000円以上</option>
+  </select>
+</div>
+
 <!-- カテゴリ説明 -->
 <div class="cat-header" id="cat-header"></div>
 
@@ -330,8 +369,39 @@
   };
 
   let allJobs = null;
-  let currentTab = 'data_entry';
+  let currentTab = 'script';
   let criteriaData = null;
+
+  // フィルター状態
+  const filters = { beginner_ok: false, no_interview: false, is_ongoing: false, allows_ai: false };
+
+  function toggleFilter(key) {
+    filters[key] = !filters[key];
+    const idMap = { beginner_ok: 'f-beginner', no_interview: 'f-interview', is_ongoing: 'f-ongoing', allows_ai: 'f-ai' };
+    document.getElementById(idMap[key]).classList.toggle('active', filters[key]);
+    applyFilters();
+  }
+
+  function parsePrice(priceStr) {
+    if (!priceStr || priceStr === '要確認') return 0;
+    const m = priceStr.replace(/,/g, '').match(/\d+/);
+    return m ? parseInt(m[0]) : 0;
+  }
+
+  function applyFilters() {
+    if (!allJobs) return;
+    const minPrice = parseInt(document.getElementById('f-price').value) || 0;
+    const jobs = allJobs[currentTab] || [];
+    const filtered = jobs.filter(j => {
+      if (filters.beginner_ok  && !j.beginner_ok)    return false;
+      if (filters.no_interview &&  j.needs_interview) return false;
+      if (filters.is_ongoing   && !j.is_ongoing)     return false;
+      if (filters.allows_ai    && !j.allows_ai)      return false;
+      if (minPrice > 0 && parsePrice(j.price) < minPrice) return false;
+      return true;
+    });
+    renderFilteredJobs(filtered);
+  }
 
   function stars(n, total=5) {
     return Array.from({length: total}, (_,i) =>
@@ -363,9 +433,12 @@
   }
 
   function renderJobs(tab) {
-    const area = document.getElementById('jobs-area');
     if (!allJobs) return;
-    const jobs = allJobs[tab] || [];
+    applyFilters();
+  }
+
+  function renderFilteredJobs(jobs) {
+    const area = document.getElementById('jobs-area');
 
     if (jobs.length === 0) {
       area.innerHTML = `<div class="empty"><div class="emoji">😅</div><p>このカテゴリの案件が見つかりませんでした。<br>しばらくしてから再試行してください。</p></div>`;
@@ -376,7 +449,9 @@
     // スコア降順でソート
     const sortedGroups = Object.entries(groups).sort((a,b) => b[1][0].score - a[1][0].score);
 
-    let html = `<div class="count-bar">${jobs.length}件の自動化向き案件が見つかりました</div>`;
+    const total = allJobs ? (allJobs[currentTab] || []).length : jobs.length;
+    const isFiltered = jobs.length < total;
+    let html = `<div class="count-bar">${isFiltered ? `${jobs.length}件（全${total}件中）` : `${jobs.length}件`}の自動化向き案件</div>`;
 
     sortedGroups.forEach(([subName, subJobs]) => {
       const score = subJobs[0].score;
@@ -394,9 +469,12 @@
                 <div class="job-title">${esc(job.title)}</div>
                 <div class="stars-wrap">${stars(job.score)}</div>
               </div>
-              <div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
                 <span class="sub-tag">🏷️ ${esc(job.subcategory)}</span>
-                ${job.needs_interview ? '<span class="interview-tag">📋 面接・Zoom必要</span>' : ''}
+                ${job.beginner_ok     ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;padding:2px 8px;border-radius:20px;">🔰 初心者可</span>' : ''}
+                ${job.needs_interview ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;padding:2px 8px;border-radius:20px;">📋 面接あり</span>' : ''}
+                ${job.is_ongoing      ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;padding:2px 8px;border-radius:20px;">🔄 継続案件</span>' : ''}
+                ${job.allows_ai       ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:20px;">🤖 AI使用OK</span>' : ''}
               </div>
               ${job.description ? `<div class="job-desc">${esc(job.description)}</div>` : ''}
               ${job.tip ? `<div class="tip-row"><span>💡</span><span>${esc(job.tip)}</span></div>` : ''}
@@ -418,7 +496,7 @@
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
     renderCatHeader(tab);
-    if (allJobs) renderJobs(tab);
+    if (allJobs) applyFilters();
   }
 
   function showFetchButton() {
