@@ -225,9 +225,14 @@ def scrape_category(category_id, pages=2):
         jina_url = f"https://r.jina.ai/{cw_url}"
         try:
             res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
+            # 402（残高不足）の場合はAPIキーなしでリトライ
+            if res.status_code == 402 and "Authorization" in headers:
+                print(f"[Jina] 402 残高不足。APIキーなしでリトライ cat={category_id}", flush=True)
+                retry_headers = {k: v for k, v in headers.items() if k != "Authorization"}
+                res = http_requests.get(jina_url, headers=retry_headers, timeout=(10, 25))
             res.encoding = "utf-8"
             text = res.text
-            print(f"[Jina] cat={category_id} page={page} status={res.status_code} len={len(text)} preview={repr(text[:120])}", flush=True)
+            print(f"[Jina] cat={category_id} page={page} status={res.status_code} links_found={len(re.findall(r'crowdworks.jp/public/jobs/\\d+', text))}", flush=True)
 
             links = re.findall(
                 r'\[([^\]]{5,})\]\(https://crowdworks\.jp/public/jobs/(\d+)[^\)]*\)',
