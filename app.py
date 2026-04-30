@@ -227,6 +227,7 @@ def scrape_category(category_id, pages=2):
             res = http_requests.get(jina_url, headers=headers, timeout=(10, 25))
             res.encoding = "utf-8"
             text = res.text
+            print(f"[Jina] cat={category_id} page={page} status={res.status_code} len={len(text)} preview={repr(text[:120])}", flush=True)
 
             links = re.findall(
                 r'\[([^\]]{5,})\]\(https://crowdworks\.jp/public/jobs/(\d+)[^\)]*\)',
