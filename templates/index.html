@@ -441,7 +441,14 @@
     const area = document.getElementById('jobs-area');
 
     if (jobs.length === 0) {
-      area.innerHTML = `<div class="empty"><div class="emoji">😅</div><p>このカテゴリの案件が見つかりませんでした。<br>しばらくしてから再試行してください。</p></div>`;
+      const totalInTab = allJobs ? (allJobs[currentTab] || []).length : 0;
+      if (totalInTab === 0) {
+        // データ自体がない → ボタンを表示
+        showFetchButton();
+      } else {
+        // フィルターで全件除外された
+        area.innerHTML = `<div class="empty"><div class="emoji">🔍</div><p>絞り込み条件に合う案件がありません。<br>フィルターを変更してみてください。</p></div>`;
+      }
       return;
     }
 
@@ -529,6 +536,11 @@
           return;
         }
         allJobs = data.jobs;
+        const total = Object.values(allJobs).reduce((s, a) => s + a.length, 0);
+        if (total === 0) {
+          showFetchButton();
+          return;
+        }
         renderJobs(currentTab);
       } catch(e) {
         document.getElementById('jobs-area').innerHTML =
@@ -546,11 +558,12 @@
         pollJobs();
         return;
       }
-      if (!data.last_updated) {
+      allJobs = data.jobs;
+      const totalJobs = Object.values(allJobs).reduce((s, a) => s + a.length, 0);
+      if (!data.last_updated || totalJobs === 0) {
         showFetchButton();
         return;
       }
-      allJobs = data.jobs;
       renderJobs(currentTab);
     } catch(e) {
       document.getElementById('jobs-area').innerHTML =
