@@ -91,35 +91,29 @@ CATEGORIES = {
         }
     },
     "sns_bot": {
-        "name": "SNS・Bot自動化",
-        "icon": "📣",
-        "description": "自動投稿・LINE Bot・競合リサーチなど反復SNS作業",
-        "category_ids": [303, 133],  # Instagram・SNS集客, その他SNS運用
-        "core_keywords": ["自動投稿", "line bot", "linebot", "bot", "競合リサーチ", "競合調査", "価格調査", "価格監視", "dm 自動", "メール 自動", "自動化", "スクレイピング"],
+        "name": "AI活用支援",
+        "icon": "✨",
+        "description": "AIツール活用・バックオフィス効率化・アノテーションなど",
+        "category_ids": [369, 366],  # AIバックオフィス支援, AIアノテーション
+        "core_keywords": [],  # カテゴリ自体が絞られているため全件表示
         "subcategories": {
-            "LINE Bot・自動応答": {
-                "keywords": ["line bot", "linebot", "公式ライン 自動", "line 自動応答", "チャットボット"],
+            "AI業務効率化・自動化支援": {
+                "keywords": ["業務効率化", "業務改善", "自動化", "効率化"],
                 "score": 5,
-                "tip": "LINE Messaging APIで完全自動化。",
-                "star_reason": "⭐⭐⭐⭐⭐：LINE APIで自動応答Bot。Claude Codeで高速実装可。"
+                "tip": "GAS・Python・AIで業務フローを自動化提案。",
+                "star_reason": "⭐⭐⭐⭐⭐：業務フロー自動化はClaude Codeで高速実装できる。"
             },
-            "SNS自動投稿": {
-                "keywords": ["自動投稿", "instagram 自動", "x 自動", "twitter 自動", "youtube 自動"],
+            "AIツール活用・導入支援": {
+                "keywords": ["aiツール", "chatgpt", "プロンプト", "ai活用", "生成ai"],
                 "score": 5,
-                "tip": "各SNS公式APIで自動投稿スクリプト実装。",
-                "star_reason": "⭐⭐⭐⭐⭐：API経由の自動投稿はPythonで完全自動化できる。"
+                "tip": "AIツール選定・プロンプト設計・実装をワンストップ対応。",
+                "star_reason": "⭐⭐⭐⭐⭐：AIツール活用支援はClaude Codeユーザーの得意領域。"
             },
-            "競合リサーチ・価格調査": {
-                "keywords": ["競合リサーチ", "競合調査", "価格調査", "価格監視", "相場調査"],
+            "AIアノテーション": {
+                "keywords": ["アノテーション", "ラベリング", "データ整備", "学習データ"],
                 "score": 4,
-                "tip": "スクレイピング+定期実行で自動監視。",
-                "star_reason": "⭐⭐⭐⭐：定期スクレイピング+通知で価格監視を完全自動化。"
-            },
-            "Webフォーム・DM自動送信": {
-                "keywords": ["dm 自動", "メール 自動", "フォーム 自動", "問い合わせ 自動"],
-                "score": 4,
-                "tip": "Selenium+テンプレートで自動送信。",
-                "star_reason": "⭐⭐⭐⭐：テンプレ文+自動送信スクリプトで効率化。"
+                "tip": "スクリプトで半自動化できるケースあり。",
+                "star_reason": "⭐⭐⭐⭐：反復ラベリングはスクリプト+AIで効率化可能。"
             },
         }
     },
@@ -187,10 +181,13 @@ def score_job(title, description, category_key):
             best_tip = sub_data["tip"]
             best_reason = sub_data.get("star_reason", "")
 
-    # サブカテゴリ未マッチでもコアキーワードがあれば★4
+    # サブカテゴリ未マッチの場合
     if best_score < MIN_SCORE:
         core_kws = category.get("core_keywords", [])
-        if any(kw in text for kw in core_kws):
+        if not core_kws:
+            # core_keywordsが空 = カテゴリ自体が絞られてるので全件★4
+            best_score = MIN_SCORE
+        elif any(kw in text for kw in core_kws):
             best_score = MIN_SCORE
 
     return best_score, best_sub, best_tip, best_reason
