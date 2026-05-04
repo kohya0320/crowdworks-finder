@@ -303,6 +303,7 @@
   <button class="tab-btn" onclick="switchTab('ai_data')" id="tab-ai_data">🧠 AI・データ処理</button>
   <button class="tab-btn" onclick="switchTab('sns_bot')" id="tab-sns_bot">✨ AI活用支援</button>
   <button class="tab-btn" onclick="switchTab('data_transform')" id="tab-data_transform">📊 データ変換</button>
+  <button class="tab-btn" onclick="switchTab('writing')" id="tab-writing">✍️ ライティング</button>
 </div>
 
 <!-- 絞り込みバー -->
@@ -311,7 +312,7 @@
   <button class="filter-chip" id="f-beginner" onclick="toggleFilter('beginner_ok')">🔰 初心者可のみ</button>
   <button class="filter-chip danger" id="f-interview" onclick="toggleFilter('no_interview')">🚫 面接なし</button>
   <button class="filter-chip green" id="f-ongoing" onclick="toggleFilter('is_ongoing')">🔄 継続案件のみ</button>
-  <button class="filter-chip blue" id="f-ai" onclick="toggleFilter('allows_ai')">🤖 AI使用OK</button>
+  <button class="filter-chip danger" id="f-ai" onclick="toggleFilter('is_ai_forbidden')">🚫 AI禁止のみ</button>
   <select class="price-select" id="f-price" onchange="applyFilters()">
     <option value="0">💰 単価下限なし</option>
     <option value="1000">💰 1,000円以上</option>
@@ -336,7 +337,7 @@
 </div>
 
 <footer>
-  ⭐5=即対応可・高単価狙い / ⭐4=自動化可 ｜ AI禁止・スマホ限定は除外済
+  ⭐5=即対応可・高単価狙い / ⭐4=自動化可 ｜ 🚫AI禁止はバッジ表示 ｜ スマホ限定は除外済
 </footer>
 
 <!-- ━━━ 応募文モーダル ━━━ -->
@@ -366,6 +367,7 @@
     ai_data:        { icon: '🧠', name: 'AI・データ処理', desc: 'ChatGPT/Claude APIや文字起こし・画像処理など。API実装で高単価狙い。' },
     sns_bot:        { icon: '✨', name: 'AI活用支援', desc: 'AIバックオフィス効率化・アノテーション。AIツール活用の得意領域。' },
     data_transform: { icon: '📊', name: 'データ整理・変換', desc: 'CSV・スプレッドシート・一括処理。pandasで最速納品できる。' },
+    writing:        { icon: '✍️', name: 'ライティング', desc: '記事・ブログ・LP・シナリオなどの執筆案件。AI禁止案件も含む。' },
   };
 
   let allJobs = null;
@@ -373,11 +375,11 @@
   let criteriaData = null;
 
   // フィルター状態
-  const filters = { beginner_ok: false, no_interview: false, is_ongoing: false, allows_ai: false };
+  const filters = { beginner_ok: false, no_interview: false, is_ongoing: false, is_ai_forbidden: false };
 
   function toggleFilter(key) {
     filters[key] = !filters[key];
-    const idMap = { beginner_ok: 'f-beginner', no_interview: 'f-interview', is_ongoing: 'f-ongoing', allows_ai: 'f-ai' };
+    const idMap = { beginner_ok: 'f-beginner', no_interview: 'f-interview', is_ongoing: 'f-ongoing', is_ai_forbidden: 'f-ai' };
     document.getElementById(idMap[key]).classList.toggle('active', filters[key]);
     applyFilters();
   }
@@ -393,10 +395,10 @@
     const minPrice = parseInt(document.getElementById('f-price').value) || 0;
     const jobs = allJobs[currentTab] || [];
     const filtered = jobs.filter(j => {
-      if (filters.beginner_ok  && !j.beginner_ok)    return false;
-      if (filters.no_interview &&  j.needs_interview) return false;
-      if (filters.is_ongoing   && !j.is_ongoing)     return false;
-      if (filters.allows_ai    && !j.allows_ai)      return false;
+      if (filters.beginner_ok    && !j.beginner_ok)     return false;
+      if (filters.no_interview   &&  j.needs_interview)  return false;
+      if (filters.is_ongoing     && !j.is_ongoing)       return false;
+      if (filters.is_ai_forbidden && !j.is_ai_forbidden) return false;
       if (minPrice > 0 && parsePrice(j.price) < minPrice) return false;
       return true;
     });
@@ -482,6 +484,7 @@
                 ${job.needs_interview ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;padding:2px 8px;border-radius:20px;">📋 面接あり</span>' : ''}
                 ${job.is_ongoing      ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;padding:2px 8px;border-radius:20px;">🔄 継続案件</span>' : ''}
                 ${job.allows_ai       ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:20px;">🤖 AI使用OK</span>' : ''}
+                ${job.is_ai_forbidden ? '<span style="display:inline-block;font-size:11px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:2px 8px;border-radius:20px;">🚫 AI禁止</span>' : ''}
               </div>
               ${job.description ? `<div class="job-desc">${esc(job.description)}</div>` : ''}
               ${job.tip ? `<div class="tip-row"><span>💡</span><span>${esc(job.tip)}</span></div>` : ''}

@@ -8,7 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # 結果格納
-_jobs_data = {cat: [] for cat in ["script", "ai_data", "sns_bot", "data_transform"]}
+_jobs_data = {cat: [] for cat in ["script", "ai_data", "sns_bot", "data_transform", "writing"]}
 _is_loading = False
 _last_updated = None
 _scrape_log = []
@@ -149,6 +149,39 @@ CATEGORIES = {
                 "star_reason": "⭐⭐⭐⭐：pandasで自動整形→納品。件数×単価で高収益になりやすい。"
             },
         }
+    },
+    "writing": {
+        "name": "ライティング",
+        "icon": "✍️",
+        "description": "記事・ブログ・LP・シナリオなどの執筆案件（AI禁止含む）",
+        "category_ids": [133, 303, 134],  # ライティング, コンテンツ作成, 記事・コラム
+        "core_keywords": [],  # カテゴリ全件表示
+        "subcategories": {
+            "記事・ブログ・SEOライティング": {
+                "keywords": ["記事", "ブログ", "seo", "コラム", "コンテンツ", "ウェブライティング", "webライティング"],
+                "score": 4,
+                "tip": "AIアシストで高速執筆。AI禁止なら手書きで対応。",
+                "star_reason": "⭐⭐⭐⭐：量産案件が多く継続受注につながりやすい。"
+            },
+            "LP・セールスライティング": {
+                "keywords": ["lp", "ランディングページ", "セールスライティング", "コピーライティング", "キャッチコピー"],
+                "score": 4,
+                "tip": "単価が高め。構成力をアピール。",
+                "star_reason": "⭐⭐⭐⭐：LP/セールス文は単価高め・継続になりやすい。"
+            },
+            "シナリオ・台本・脚本": {
+                "keywords": ["シナリオ", "台本", "脚本", "動画台本", "youtube台本", "ナレーション"],
+                "score": 4,
+                "tip": "動画台本は需要増加中。AI活用で量産可。",
+                "star_reason": "⭐⭐⭐⭐：動画市場拡大で台本需要が高い。"
+            },
+            "その他ライティング": {
+                "keywords": ["ライティング", "文章", "執筆", "テキスト", "原稿"],
+                "score": 4,
+                "tip": "内容を確認して対応可否を判断。",
+                "star_reason": "⭐⭐⭐⭐：ライティング全般。"
+            },
+        }
     }
 }
 
@@ -159,14 +192,16 @@ BEGINNER_OK_KEYWORDS = ["初心者ok", "初心者歓迎", "未経験ok", "未経
 INTERVIEW_KEYWORDS   = ["面接", "面談", "zoom", "google meet", "teams", "skype", "ビデオ通話", "オンライン面接", "zoomにて"]
 ONGOING_KEYWORDS     = ["継続", "長期", "月額", "定期依頼", "継続案件", "長期依頼", "継続的"]
 ALLOWS_AI_KEYWORDS   = ["chatgptok", "chatgpt ok", "ai ok", "aiok", "ai使用可", "ai活用ok", "chatgpt使用", "生成ai ok", "生成aiok", "aiツール使用可"]
+AI_FORBIDDEN_KEYWORDS = ["ai禁止", "chatgpt禁止", "aiツール不可", "ai不可", "ai使用禁止"]
 
 def detect_flags(title, description):
     text = (title + " " + description).lower()
     return {
-        "beginner_ok":    any(kw in text for kw in BEGINNER_OK_KEYWORDS),
+        "beginner_ok":     any(kw in text for kw in BEGINNER_OK_KEYWORDS),
         "needs_interview": any(kw in text for kw in INTERVIEW_KEYWORDS),
-        "is_ongoing":     any(kw in text for kw in ONGOING_KEYWORDS),
-        "allows_ai":      any(kw in text for kw in ALLOWS_AI_KEYWORDS),
+        "is_ongoing":      any(kw in text for kw in ONGOING_KEYWORDS),
+        "allows_ai":       any(kw in text for kw in ALLOWS_AI_KEYWORDS),
+        "is_ai_forbidden": any(kw in text for kw in AI_FORBIDDEN_KEYWORDS),
     }
 
 # ★4未満は表示しない
@@ -174,7 +209,6 @@ MIN_SCORE = 4
 
 # 除外キーワード（これがあれば非表示）
 EXCLUDE_KEYWORDS = [
-    "ai禁止", "chatgpt禁止", "aiツール不可", "ai不可", "ai使用禁止",
     "スマホのみ", "スマホ限定", "pc不可",
 ]
 
