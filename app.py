@@ -8,7 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # 結果格納
-_jobs_data = {cat: [] for cat in ["script", "ai_data", "sns_bot", "data_transform", "writing"]}
+_jobs_data = {cat: [] for cat in ["script", "ai_data", "sns_bot", "data_transform", "writing", "copy_paste"]}
 _is_loading = False
 _last_updated = None
 _scrape_log = []
@@ -147,6 +147,39 @@ CATEGORIES = {
                 "score": 4,
                 "tip": "pandasで自動整形。件数が多いほど価値が高い。",
                 "star_reason": "⭐⭐⭐⭐：pandasで自動整形→納品。件数×単価で高収益になりやすい。"
+            },
+        }
+    },
+    "copy_paste": {
+        "name": "コピペ・データ入力",
+        "icon": "📋",
+        "description": "データ入力・転記・リスト作成など単純作業案件（即対応可）",
+        "category_ids": [249, 250, 251],  # データ作成・入力系
+        "core_keywords": [],  # カテゴリ全件表示
+        "subcategories": {
+            "データ入力・転記": {
+                "keywords": ["データ入力", "転記", "テキスト入力", "文字入力", "入力作業", "データ転記"],
+                "score": 4,
+                "tip": "即対応可能。件数が多いほど安定収入に。",
+                "star_reason": "⭐⭐⭐⭐：単純入力作業。経験不問で即納品できる。"
+            },
+            "リスト作成・情報収集": {
+                "keywords": ["リスト作成", "リスト収集", "情報収集", "一覧作成", "まとめ作業"],
+                "score": 4,
+                "tip": "コピペ+整形で対応。",
+                "star_reason": "⭐⭐⭐⭐：リスト系はスピードと正確さで差別化できる。"
+            },
+            "文字起こし・書き起こし": {
+                "keywords": ["文字起こし", "書き起こし", "pdf入力", "画像入力", "音声入力"],
+                "score": 4,
+                "tip": "AI OCRや音声認識で効率化できるケースあり。",
+                "star_reason": "⭐⭐⭐⭐：量が多いほど稼げる。AI補助で速度アップ可。"
+            },
+            "その他単純作業": {
+                "keywords": ["コピペ", "単純作業", "簡単作業", "軽作業", "入力"],
+                "score": 4,
+                "tip": "内容を確認して即対応。",
+                "star_reason": "⭐⭐⭐⭐：単純作業全般。"
             },
         }
     },
@@ -317,7 +350,7 @@ def run_scraping():
     _scrape_log.append("開始")
     print("[Scraper] スクレイピング開始（並列）...", flush=True)
     result = {cat_key: [] for cat_key in CATEGORIES}
-    seen_links = set()
+    seen_links = {cat_key: set() for cat_key in CATEGORIES}
     lock = threading.Lock()
 
     # タスク一覧: (cat_key, category_id)
@@ -344,9 +377,9 @@ def run_scraping():
             print(f"[Scraper] {msg}", flush=True)
             with lock:
                 for job in raw_jobs:
-                    if job["link"] in seen_links:
+                    if job["link"] in seen_links[cat_key]:
                         continue
-                    seen_links.add(job["link"])
+                    seen_links[cat_key].add(job["link"])
 
                     combined = (job["title"] + " " + job["description"]).lower()
 
@@ -447,19 +480,19 @@ def generate_message():
     if not link or "crowdworks.jp" not in link:
         return jsonify({"error": "invalid link"}), 400
 
-    # 案件ページの全文を取得（requestsで軽量取得）
+    # 案件ページの全文をJina経由で取得（CrowdWorksはJS描画のため直接取得不可）
     job_text = ""
     try:
-        import requests as req
-        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
-        r = req.get(link, headers=headers, timeout=15)
+        jina_headers = {"Accept": "text/plain", "User-Agent": "Mozilla/5.0"}
+        jina_key = os.environ.get("JINA_API_KEY", "")
+        if jina_key:
+            jina_headers["Authorization"] = f"Bearer {jina_key}"
+        r = http_requests.get(f"https://r.jina.ai/{link}", headers=jina_headers, timeout=25)
+        if r.status_code == 402 and "Authorization" in jina_headers:
+            retry_headers = {k: v for k, v in jina_headers.items() if k != "Authorization"}
+            r = http_requests.get(f"https://r.jina.ai/{link}", headers=retry_headers, timeout=25)
         r.encoding = "utf-8"
-        # タグ除去
-        text = re.sub(r'<script[^>]*>.*?</script>', '', r.text, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        job_text = text[:4000]
+        job_text = r.text[:4000]
     except Exception as e:
         return jsonify({"error": f"ページ取得失敗: {e}"}), 500
 
