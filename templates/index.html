@@ -335,6 +335,7 @@
       <small style="color:#ccc">初回は1〜2分かかります。しばらくお待ちください。</small></p>
     </div>
   </div>
+  <div id="load-more-area"></div>
 </div>
 
 <footer>
@@ -375,6 +376,10 @@
   let allJobs = null;
   let currentTab = 'script';
   let criteriaData = null;
+
+  // タブごとの次取得ページ（初回2ページ取得済み → 次は3ページ目から）
+  const nextPageByTab = { script: 3, ai_data: 3, sns_bot: 3, data_transform: 3, writing: 3, copy_paste: 3 };
+  let loadingMore = false;
 
   // フィルター状態
   const filters = { beginner_ok: false, no_interview: false, is_ongoing: false, is_ai_forbidden: false };
@@ -501,6 +506,55 @@
     });
 
     area.innerHTML = html;
+    renderLoadMoreBtn();
+  }
+
+  function renderLoadMoreBtn() {
+    const area = document.getElementById('load-more-area');
+    if (!allJobs || (allJobs[currentTab] || []).length === 0) {
+      area.innerHTML = '';
+      return;
+    }
+    const page = nextPageByTab[currentTab];
+    area.innerHTML = `
+      <div style="text-align:center;padding:16px 0 8px;">
+        <button id="load-more-btn" onclick="loadMore()"
+          style="padding:11px 28px;background:var(--white);color:var(--orange);
+                 border:2px solid var(--orange);border-radius:24px;
+                 font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;">
+          📥 次の50件を取得（${page}〜${page+1}ページ目）
+        </button>
+      </div>`;
+  }
+
+  async function loadMore() {
+    if (loadingMore) return;
+    loadingMore = true;
+    const btn = document.getElementById('load-more-btn');
+    if (btn) { btn.textContent = '⏳ 取得中…'; btn.disabled = true; }
+
+    const page = nextPageByTab[currentTab];
+    try {
+      const res = await fetch(`/api/fetch-more?cat_key=${currentTab}&page_start=${page}&pages=2`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.jobs && data.jobs.length > 0) {
+        // 重複除外して追記
+        const existingLinks = new Set((allJobs[currentTab] || []).map(j => j.link));
+        const newJobs = data.jobs.filter(j => !existingLinks.has(j.link));
+        allJobs[currentTab] = [...(allJobs[currentTab] || []), ...newJobs];
+        nextPageByTab[currentTab] += 2;
+        applyFilters();
+      } else {
+        const btn2 = document.getElementById('load-more-btn');
+        if (btn2) { btn2.textContent = 'これ以上ありません'; btn2.disabled = true; }
+      }
+    } catch(e) {
+      const btn2 = document.getElementById('load-more-btn');
+      if (btn2) { btn2.textContent = '⚠️ 取得失敗。再試行してください'; btn2.disabled = false; }
+    } finally {
+      loadingMore = false;
+    }
   }
 
   function switchTab(tab) {
@@ -508,6 +562,7 @@
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
     renderCatHeader(tab);
+    document.getElementById('load-more-area').innerHTML = '';
     if (allJobs) applyFilters();
   }
 

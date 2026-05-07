@@ -274,7 +274,7 @@ def score_job(title, description, category_key):
     return best_score, best_sub, best_tip, best_reason
 
 
-def scrape_category(category_id, pages=2):
+def scrape_category(category_id, pages=2, page_start=1):
     """カテゴリページからCrowdWorksの案件を取得"""
     jobs_raw = []
     seen_ids = set()
@@ -287,7 +287,7 @@ def scrape_category(category_id, pages=2):
     if jina_key:
         headers["Authorization"] = f"Bearer {jina_key}"
 
-    for page in range(1, pages + 1):
+    for page in range(page_start, page_start + pages):
         cw_url = f"https://crowdworks.jp/public/jobs/category/{category_id}?job_type=fixed&order=new&page={page}"
         jina_url = f"https://r.jina.ai/{cw_url}"
         try:
@@ -440,6 +440,55 @@ def api_jobs():
         "last_updated": _last_updated.isoformat() if _last_updated else None,
         "jobs": _jobs_data,
     })
+
+
+@app.route("/api/fetch-more")
+def api_fetch_more():
+    """指定カテゴリの追加ページを取得して返す"""
+    cat_key = request.args.get("cat_key", "")
+    page_start = int(request.args.get("page_start", 3))
+    pages = int(request.args.get("pages", 2))
+
+    if cat_key not in CATEGORIES:
+        return jsonify({"error": "invalid category"}), 400
+
+    cat_data = CATEGORIES[cat_key]
+    new_jobs = []
+    cat_seen = set()
+
+    def fetch_task(cat_id):
+        return scrape_category(cat_id, pages=pages, page_start=page_start)
+
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(fetch_task, cat_id) for cat_id in cat_data["category_ids"]]
+            for future in as_completed(futures, timeout=90):
+                raw_jobs = future.result()
+                for job in raw_jobs:
+                    if job["link"] in cat_seen:
+                        continue
+                    cat_seen.add(job["link"])
+                    combined = (job["title"] + " " + job["description"]).lower()
+                    if any(kw in combined for kw in EXCLUDE_KEYWORDS):
+                        continue
+                    score, sub, tip, reason = score_job(job["title"], job["description"], cat_key)
+                    if score < MIN_SCORE:
+                        continue
+                    flags = detect_flags(job["title"], job["description"])
+                    new_jobs.append({
+                        **job,
+                        "score": score,
+                        "subcategory": sub,
+                        "tip": tip,
+                        "star_reason": reason,
+                        "category": cat_key,
+                        **flags,
+                    })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    new_jobs.sort(key=lambda x: x["score"], reverse=True)
+    return jsonify({"jobs": new_jobs, "count": len(new_jobs), "page_start": page_start})
 
 
 @app.route("/api/refresh")
